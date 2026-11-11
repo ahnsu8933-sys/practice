@@ -85,12 +85,33 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .overlay {
   position: absolute; inset: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
   gap: 12px;
-  padding: 24px 20px;
+  padding: 52px 20px 24px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   text-align: center;
   overflow-y: auto;
   background: linear-gradient(180deg, rgba(20,22,48,0.25) 0%, var(--panel) 40%, rgba(20,22,48,0.88) 100%);
+}
+.overlay > * { flex-shrink: 0; }
+.overlay > :first-child { margin-top: auto; }
+.overlay > :last-child { margin-bottom: auto; }
+@media (max-width: 520px), (max-height: 760px) {
+  .overlay { gap: 6px; padding: 46px 14px 12px; }
+  h1 { font-size: 40px; }
+  h2 { font-size: 24px; }
+  #setupScr .section-label { display: none; }
+  #setupScr .actions { margin-top: 2px; }
+  #setupScr .eyebrow, #setupScr > p.small:last-child, #overScr > p.small:last-child, #contScr > p.small:last-child, #pauseScr > p.small:last-child { display: none; }
+  .pinfo { padding: 8px 10px; gap: 2px; }
+  .pi-name { font-size: 16px; }
+  .pi-story { font-size: 12px; line-height: 1.4; }
+  .seg button { padding: 10px 16px; }
+  #diffDesc { min-height: 0; font-size: 12px; }
+  .btn { font-size: 19px; padding: 10px 26px; }
+  .keys { font-size: 12px; gap: 4px 10px; }
+  .lead { font-size: 13px; line-height: 1.45; }
 }
 .eyebrow { margin: 0; font-size: 13px; letter-spacing: 0.18em; color: var(--flare); }
 h1, h2 {
@@ -1543,7 +1564,8 @@ function makeShooter() {
   const ENTER = { beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
   let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending;
-  const bspd = () => (1 + 0.09 * (stageNo - 1)) * D.bullet;
+  const grow = () => Math.min(stageNo - 1, 16);
+  const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet;
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
   const turretsLeft = () => enemies.some(o => o.type === 'turret' && !o.dead);
   const later = (delay, fn) => timers.push({ t: delay, fn });
@@ -1562,7 +1584,6 @@ function makeShooter() {
   function startScene(lines, onEnd) {
     scene = { lines, i: 0, t: 0, onEnd };
     eb = []; beams = []; drag = null; anchor = null;
-    for (const k in keys) keys[k] = false;
   }
   function advanceScene() {
     if (!scene) return;
@@ -1584,21 +1605,21 @@ function makeShooter() {
   }
   function addEnemy(type, o) {
     const b = ETYPES[type];
-    const hp = Math.ceil(b.hp * (1 + 0.3 * (stageNo - 1)) * D.ehp);
+    const hp = Math.ceil(b.hp * Math.max(1.3 + 0.1 * grow(), 1.55 + 0.05 * grow()) * D.ehp);
     enemies.push(Object.assign({ type, t: 0, hp, maxHp: hp, r: b.r, score: b.score, drop: b.drop, flash: 0, fireT: rand(0.9, 1.8), phase: 0, vx: 0, vy: 0, ang: Math.PI / 2 }, o));
   }
   function spawnWave() {
     const s = stageNo, r = Math.random();
     if (r < 0.36 || (stageTime < 8 && s === 1)) {
-      const n = 4 + Math.min(3, s - 1);
+      const n = Math.max(5, 4 + Math.min(3, Math.floor(grow() / 3)));
       const x0 = rand(90, W - 90), amp = rand(30, 80), freq = rand(1.6, 2.6);
-      for (let i = 0; i < n; i++) addEnemy('scout', { x: x0, y: -30 - i * 44, x0, amp, freq, vy: 120 + s * 8, phase: i * 0.45 });
+      for (let i = 0; i < n; i++) addEnemy('scout', { x: x0, y: -30 - i * 44, x0, amp, freq, vy: 125 + 4 * grow(), phase: i * 0.45 });
     } else if (r < 0.58) {
-      const k = 2 + Math.min(3, Math.floor(s / 2));
+      const k = Math.max(grow() >= 1 ? 3 : 2, 2 + Math.min(2, Math.floor(grow() / 4)));
       for (let i = 0; i < k; i++) addEnemy('diver', { x: rand(50, W - 50), y: -30 - i * 34, ty: rand(80, 230) });
     } else if (r < 0.82) {
       addEnemy('gunner', { x: rand(70, W / 2 - 30), y: -40, ty: rand(110, 240) });
-      if (s >= 2 || Math.random() < 0.4) addEnemy('gunner', { x: rand(W / 2 + 30, W - 70), y: -70, ty: rand(110, 240) });
+      if (Math.random() < Math.min(0.8, Math.max(0.5, 0.3 + 0.06 * grow()))) addEnemy('gunner', { x: rand(W / 2 + 30, W - 70), y: -70, ty: rand(110, 240) });
     } else {
       addEnemy('heavy', { x: rand(100, W - 100), y: -70 });
     }
@@ -1607,7 +1628,7 @@ function makeShooter() {
   function spawnBoss() {
     bossSpawned = true;
     bossKind = BOSS_ORDER[(stageNo - 1) % BOSS_ORDER.length];
-    const m = (1 + 0.28 * (stageNo - 1)) * D.ehp;
+    const m = (1 + 0.08 * grow()) * D.ehp;
     const mk = (type, hp, o) => {
       hp = Math.round(hp * m);
       const e = Object.assign({ type, t: 0, mt: 0, flash: 0, isBoss: true, dead: false, hp, maxHp: hp, fireT: 1.6, fire2: 1.5, spin: 0, arrived: false }, o);
@@ -1615,23 +1636,23 @@ function makeShooter() {
       return e;
     };
     if (bossKind === 'whale') {
-      mk('whale', 220, { x: W / 2, y: -80, hw: 105, hh: 32, r: 40, ringT: 3, burst: 0, burstT: 0, dcT: 2, score: 4000 });
+      mk('whale', 800, { x: W / 2, y: -80, hw: 105, hh: 32, r: 40, ringT: 3, burst: 0, burstT: 0, dcT: 2, score: 4000 });
     } else if (bossKind === 'twin') {
-      for (const k of [0, 1]) mk('twin', 150, { k, x: W / 2 + (k ? -150 : 150), y: -80 - k * 40, r: 30, theta: k * Math.PI, fireT: 1.5 + k * 0.8, score: 2500 });
+      for (const k of [0, 1]) mk('twin', 420, { k, x: W / 2 + (k ? -150 : 150), y: -80 - k * 40, r: 30, theta: k * Math.PI, fireT: 1.5 + k * 0.8, score: 2500 });
     } else if (bossKind === 'nest') {
-      mk('nest', 260, { x: W / 2, y: -80, hw: 95, hh: 32, r: 40, launchT: 1.2, launchFx: 0, score: 4500 });
+      mk('nest', 860, { x: W / 2, y: -80, hw: 95, hh: 32, r: 40, launchT: 1.2, launchFx: 0, score: 4500 });
     } else if (bossKind === 'beacon') {
-      mk('beacon', 250, { x: W / 2, y: -90, r: 44, spin: Math.PI / 2, arms: 2, on: false, emitT: 0, fireT: 2.4, score: 4800 });
+      mk('beacon', 880, { x: W / 2, y: -90, r: 44, spin: Math.PI / 2, arms: 2, on: false, emitT: 0, fireT: 2.4, score: 4800 });
     } else if (bossKind === 'cloud') {
-      mk('cloud', 270, { x: W / 2, y: -90, hw: 100, hh: 34, r: 40, rainT: 1, ltT: 3, fireT: 2, score: 5000 });
+      mk('cloud', 900, { x: W / 2, y: -90, hw: 100, hh: 34, r: 40, rainT: 1, ltT: 3, fireT: 2, score: 5000 });
     } else if (bossKind === 'boss') {
-      mk('boss', 280, { x: W / 2, y: -110, hw: 70, hh: 34, r: 48, beamT: 3, freeze: 0, score: 5000 });
+      mk('boss', 920, { x: W / 2, y: -110, hw: 70, hh: 34, r: 48, beamT: 3, freeze: 0, score: 5000 });
     } else if (bossKind === 'ace') {
-      mk('ace', 200, { x: W / 2, y: -60, r: 24, mode: 'roam', pickT: 0, tx: W / 2, ty: 150, burst: 0, burstT: 0, dashT: 4, face: Math.PI / 2, score: 5500 });
+      mk('ace', 780, { x: W / 2, y: -60, r: 24, mode: 'roam', pickT: 0, tx: W / 2, ty: 150, burst: 0, burstT: 0, dashT: 4, face: Math.PI / 2, score: 5500 });
     } else {
-      const core = mk('dread', 240, { x: W / 2, y: -130, hw: 58, hh: 36, r: 50, armored: true, ltT: 2, score: 6000 });
+      const core = mk('dread', 600, { x: W / 2, y: -130, hw: 58, hh: 36, r: 50, armored: true, ltT: 2, score: 6000 });
       [[-92, -16], [92, -16], [-46, 30], [46, 30]].forEach(([ox, oy], i) => {
-        mk('turret', 45, { parent: core, ox, oy, x: core.x + ox, y: core.y + oy, r: 17, fireT: 1.4 + i * 0.35, aim: Math.PI / 2, score: 800 });
+        mk('turret', 85, { parent: core, ox, oy, x: core.x + ox, y: core.y + oy, r: 17, fireT: 1.4 + i * 0.35, aim: Math.PI / 2, score: 800 });
       });
     }
     showBanner('WARNING', bossLabel() + ' 접근 중', 2.8, true);
@@ -2426,12 +2447,13 @@ function makeShooter() {
     } else if (e.type === 'cloud') {
       // weather ship: swaying wind pushes the plane, rain falls with the wind, lightning in phase 2
       e.x = W / 2 + Math.sin(mt * 0.45) * 100; e.y = 140 + Math.sin(mt * 0.9) * 8;
-      const wind = Math.sin(mt * 0.9) * (e.phase2 ? 150 : 105);
+      const gust = Math.sin(mt * 0.9);
+      const wind = Math.abs(gust) < 0.4 ? 0 : Math.sign(gust) * (Math.abs(gust) - 0.4) / 0.6 * (e.phase2 ? 80 : 55);
       windNow = wind;
       if (!player.dead) player.x = clamp(player.x + wind * dt, 22, W - 22);
       e.rainT -= fr;
       if (e.rainT <= 0) {
-        for (let i = 0; i < (e.phase2 ? 7 : 5); i++) eb.push({ x: rand(-40, W + 40), y: -10, vx: wind * 0.8, vy: 210 * bspd(), r: 4, color: 2 });
+        for (let i = 0; i < (e.phase2 ? 7 : 5); i++) eb.push({ x: rand(-40, W + 40), y: -10, vx: wind * 1.5, vy: 210 * bspd(), r: 4, color: 2 });
         e.rainT = 0.55;
       }
       e.fireT -= fr;
@@ -2531,7 +2553,7 @@ function makeShooter() {
       if (e.type === 'scout') {
         e.y += e.vy * dt;
         e.x = e.x0 + Math.sin(e.t * e.freq + e.phase) * e.amp;
-        if (stageNo >= 2) { e.fireT -= fr; if (e.fireT <= 0 && e.y > 40 && e.y < H * 0.6) { shootAt(e.x, e.y, 170); e.fireT = rand(2.5, 4.5); } }
+        e.fireT -= fr; if (e.fireT <= 0 && e.y > 40 && e.y < H * 0.6) { shootAt(e.x, e.y, 170); e.fireT = rand(2.8, 4.8); }
         if (e.y > H + 40) e.gone = true;
       } else if (e.type === 'diver') {
         if (e.phase === 0) { e.y += 220 * dt; if (e.y >= e.ty) { e.phase = 1; e.t = 0; } }
@@ -2545,14 +2567,14 @@ function makeShooter() {
         else if (e.phase === 1) {
           e.x += Math.sin(e.t * 1.2) * 30 * dt;
           e.fireT -= fr;
-          if (e.fireT <= 0) { shootAt(e.x, e.y + 10, 200, 3, 0.2); e.fireT = Math.max(0.8, 1.5 - 0.1 * stageNo); }
+          if (e.fireT <= 0) { shootAt(e.x, e.y + 10, 200, 3, 0.2); e.fireT = Math.max(1, 1.5 - 0.04 * grow()); }
           if (e.t > 4.5) { e.phase = 2; e.vx = e.x < W / 2 ? -160 : 160; }
         } else { e.x += e.vx * dt; e.y += 60 * dt; if (e.x < -50 || e.x > W + 50) e.gone = true; }
       } else if (e.type === 'heavy') {
         e.y += 38 * dt;
         e.x += Math.sin(e.t * 0.7) * 20 * dt;
         e.fireT -= fr;
-        if (e.fireT <= 0 && e.y > 30) { ring(e.x, e.y, 10 + stageNo * 2, 130, e.t); e.fireT = Math.max(1.3, 2.4 - 0.15 * stageNo); }
+        if (e.fireT <= 0 && e.y > 30) { ring(e.x, e.y, Math.max(13, 10 + Math.min(8, grow())), 130, e.t); e.fireT = Math.max(1.6, 2.4 - 0.06 * grow()); }
         if (e.y > H + 60) e.gone = true;
       } else {
         updateBoss(e, dt);
@@ -2752,7 +2774,7 @@ function makeShooter() {
         if (stageTime >= STAGE_LEN) { if (enemies.length === 0 || stageTime >= STAGE_LEN + 4) spawnBoss(); }
         else {
           spawnT -= dt;
-          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.7, rand(1.6, 2.6) - 0.18 * (stageNo - 1)) * D.spawn; }
+          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn; }
         }
       }
       updateWorld(dt);
@@ -2785,7 +2807,7 @@ function makeShooter() {
       for (const e of enemies) if (e.type === 'turret') drawEnemy(e);
       drawBeams();
       if (windNow) {
-        const dir = Math.sign(windNow), a = Math.min(1, Math.abs(windNow) / 100);
+        const dir = Math.sign(windNow), a = Math.min(1, Math.abs(windNow) / 50);
         ctx.strokeStyle = `rgba(220,230,255,${0.35 * a})`; ctx.lineWidth = 2; ctx.lineCap = 'round';
         ctx.beginPath();
         for (let i = 0; i < 14; i++) {
