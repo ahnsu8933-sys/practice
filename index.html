@@ -1610,6 +1610,12 @@ function makeShooter() {
   }
   function spawnWave() {
     const s = stageNo, r = Math.random();
+    // stages 2-7: the player is already powered up, so add a small escort squad to some waves
+    const extra = grow() >= 1 && grow() <= 6 ? 0.75 : 0;
+    if (Math.random() < extra) {
+      const x0 = rand(70, W - 70), freq = rand(1.8, 2.8);
+      for (let i = 0; i < 3; i++) addEnemy('scout', { x: x0, y: -120 - i * 40, x0, amp: rand(20, 50), freq, vy: 135 + 4 * grow(), phase: i * 0.5 });
+    }
     if (r < 0.36 || (stageTime < 8 && s === 1)) {
       const n = Math.max(5, 4 + Math.min(3, Math.floor(grow() / 3)));
       const x0 = rand(90, W - 90), amp = rand(30, 80), freq = rand(1.6, 2.6);
