@@ -68,7 +68,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .chip:focus-visible, .btn:focus-visible, .card:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
 #pauseBtn { top: 10px; right: 10px; }
 #soundBtn { top: 10px; right: 64px; }
-#musicBtn { top: 10px; right: 138px; }
+#musicBtn { top: 10px; right: 150px; }
 #ultBtn {
   bottom: 88px; right: 14px;
   width: 64px; height: 64px; padding: 0;
@@ -240,7 +240,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
   <div id="stage">
     <canvas id="game" aria-label="게임 화면"></canvas>
     <button class="chip" id="musicBtn" type="button">음악 켬</button>
-    <button class="chip" id="soundBtn" type="button">소리 켬</button>
+    <button class="chip" id="soundBtn" type="button">효과음 켬</button>
     <button class="chip" id="pauseBtn" type="button" aria-label="일시정지" hidden>II</button>
     <button class="chip" id="bombBtn" type="button" hidden>폭탄</button>
     <button class="chip" id="ultBtn" type="button" hidden>편대</button>
@@ -343,6 +343,7 @@ fit();
 
 /* ================= audio ================= */
 let actx = null, muted = false;
+try { muted = localStorage.getItem('cloudsea-sound') === 'off'; } catch (e) {}
 function initAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
   if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
@@ -460,12 +461,12 @@ const Music = (() => {
     setLevel(v) { level = v; },
     refresh() {
       if (!actx) return;
-      out().gain.setTargetAtTime(musicOn && !muted ? level : 0, actx.currentTime, 0.08);
+      out().gain.setTargetAtTime(musicOn ? level : 0, actx.currentTime, 0.08);
     },
     tick() {
       if (!actx || !cur || actx.state !== 'running') return;
       this.refresh();
-      if (!musicOn || muted) { next = 0; return; }
+      if (!musicOn) { next = 0; return; }
       const tr = TRACKS[cur], sd = 60 / tr.bpm / 2, now = actx.currentTime;
       if (next < now) next = now + 0.06;
       while (next < now + 0.3) {
@@ -988,9 +989,9 @@ function drawEnemy(e) {
     ctx.fillStyle = `rgba(255,77,109,${blink})`;
     ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fill();
   } else if (e.type === 'heavy') {
-    ctx.fillStyle = col('#2f3a52');
+    ctx.fillStyle = col(e.heavyEscort ? '#d5dceb' : '#2f3a52');
     rr(-48, -10, 96, 18, 8); ctx.fill();
-    ctx.fillStyle = col('#3c4a68');
+    ctx.fillStyle = col(e.heavyEscort ? '#f4f7fc' : '#3c4a68');
     ctx.beginPath(); ctx.ellipse(0, 0, 14, 34, 0, 0, TAU); ctx.fill();
     rr(-20, -32, 40, 8, 3); ctx.fill();
     ctx.fillStyle = '#1b2236';
@@ -1563,7 +1564,7 @@ function makeShooter() {
   };
   const ENTER = { beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
-  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending;
+  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT;
   const grow = () => Math.min(stageNo - 1, 16);
   const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet;
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
@@ -1633,6 +1634,7 @@ function makeShooter() {
 
   function spawnBoss() {
     bossSpawned = true;
+    bossItemT = 6; escortT = 1; heavyT = 6;
     bossKind = BOSS_ORDER[(stageNo - 1) % BOSS_ORDER.length];
     const m = (1 + 0.08 * grow()) * D.ehp;
     const mk = (type, hp, o) => {
@@ -1685,6 +1687,7 @@ function makeShooter() {
     for (const b of eb) spark(b.x, b.y, '255,150,170', 2);
     eb = [];
     showBanner('격노', BOSS_INFO[e.type].name + '의 공격이 거세져요', 1.7, true);
+    dropItem(clamp(e.x - 26, 30, W - 30), e.y, 'P'); dropItem(clamp(e.x + 26, 30, W - 30), e.y, 'H');
     boom(0.9, 0.26, 700); tone(110, 0.6, 'sawtooth', 0.07, 55);
   }
 
@@ -2302,13 +2305,14 @@ function makeShooter() {
       explode(e.x, e.y, e.type === 'turret' ? 1.4 : 2.6);
       if (e.type === 'turret' && !turretsLeft()) {
         e.parent.armored = false;
+        dropItem(e.parent.x - 26, e.parent.y + 40, 'P'); dropItem(e.parent.x + 26, e.parent.y + 40, 'H');
         showBanner('장갑 붕괴', '폭풍눈의 중심부가 드러났어요', 1.8, true);
         parts.push({ kind: 'wave', x: e.parent.x, y: e.parent.y, life: 0.8, max: 0.8, size: 700, color: '150,200,255' });
         tone(440, 0.2, 'triangle', 0.05, 880);
       }
       if (e.type === 'twin') {
         const other = enemies.find(o => o.type === 'twin' && !o.dead);
-        if (other) { other.enraged = true; showBanner('분노', '남은 전투기가 빨라져요', 1.6, true); }
+        if (other) { dropItem(clamp(e.x - 26, 30, W - 30), e.y, 'P'); dropItem(clamp(e.x + 26, 30, W - 30), e.y, 'H'); other.enraged = true; showBanner('분노', '남은 전투기가 빨라져요', 1.6, true); }
       }
       if (!bossParts().length) stageClear(e);
       return;
@@ -2785,6 +2789,41 @@ function makeShooter() {
       }
       updateWorld(dt);
       if (scene) return;
+      if (bossSpawned && clearT <= 0) {
+        const b = enemies.find(e => e.isBoss && e.type !== 'turret' && !e.dead);
+        if (b) {
+          // escort squad: a few scouts fly in beside the boss (fewer for the carrier, which launches its own)
+          escortT -= dt;
+          if (escortT <= 0) {
+            const nest = b.type === 'nest';
+            escortT = (nest ? 5 : 3.5) - Math.min(1, 0.1 * grow());
+            if (enemies.filter(e => e.escort && !e.dead).length < 11) {
+              const n = nest ? 4 : grow() >= 4 ? 6 : 5, side = Math.random() < 0.5 ? -1 : 1;
+              const x0 = clamp(b.x + side * rand(110, 170), 60, W - 60), freq = rand(1.8, 2.8);
+              for (let i = 0; i < n; i++) addEnemy('scout', { x: x0, y: -30 - i * 40, x0, amp: rand(20, 45), freq, vy: 135 + 4 * grow(), phase: i * 0.5, escort: true });
+            }
+          }
+          // a heavy bomber joins now and then, one at a time, on the side away from the boss
+          if (b.arrived) heavyT -= dt;
+          if (heavyT <= 0) {
+            heavyT = (b.type === 'nest' ? 13 : 10) - Math.min(2, 0.2 * grow());
+            if (!enemies.some(e => e.heavyEscort && !e.dead)) addEnemy('heavy', { x: b.x < W / 2 ? rand(W - 150, W - 90) : rand(90, 150), y: -70, heavyEscort: true });
+          }
+          if (b.arrived) bossItemT -= dt;
+          if (bossItemT <= 0) {
+            bossItemT = 8;
+            const r = Math.random(), hurt = p.hp < p.maxHp, low = p.hp <= p.maxHp / 2;
+            let kind;
+            if (hurt && r < (low ? 0.55 : 0.3)) kind = 'H';
+            else if (p.power < 5 && r < 0.85) kind = 'P';
+            else if (hurt && r < 0.7) kind = 'H';
+            else if (r < 0.9) kind = 'B';
+            else kind = ['M', 'L', 'S'][Math.floor(Math.random() * 3)];
+            dropItem(clamp(b.x + rand(-40, 40), 30, W - 30), b.y + (b.hh || b.r), kind);
+            parts.push({ kind: 'ring', x: b.x, y: b.y + (b.hh || b.r), life: 0.4, max: 0.4, size: 40, color: '255,236,200' });
+          }
+        }
+      }
       for (const it of items) {
         it.t += dt; it.y += it.vy * dt; it.x += Math.sin(it.t * 3) * 30 * dt;
         if (Math.hypot(it.x - p.x, it.y - p.y) < 28) {
@@ -2991,7 +3030,7 @@ function syncUI() {
   $('contScr').hidden = m !== 'continue';
   $('bombBtn').hidden = !(m === 'play' && App.game && App.game.hasBomb);
   $('pauseBtn').hidden = m !== 'play' && m !== 'paused';
-  $('soundBtn').textContent = muted ? '소리 끔' : '소리 켬';
+  $('soundBtn').textContent = muted ? '효과음 끔' : '효과음 켬';
   $('musicBtn').textContent = musicOn ? '음악 켬' : '음악 끔';
   Music.refresh();
   for (const id of ORDER) $('best-' + id).textContent = fmt(bests[id]);
@@ -3106,11 +3145,18 @@ $('retryBtn').addEventListener('click', () => App.retry());
 $('overMenuBtn').addEventListener('click', () => App.menu());
 $('pauseMenuBtn').addEventListener('click', () => App.menu());
 $('resumeBtn').addEventListener('click', () => App.pause());
-$('pauseBtn').addEventListener('click', () => App.pause());
+$('pauseBtn').addEventListener('click', e => { e.currentTarget.blur(); App.pause(); });
+for (const id of ['soundBtn', 'musicBtn', 'pauseBtn', 'bombBtn', 'ultBtn']) $(id).addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'Enter') e.preventDefault(); });
 $('bombBtn').addEventListener('click', () => { if (App.game && App.game.bomb) App.game.bomb(); });
 $('ultBtn').addEventListener('click', () => { if (App.game && App.game.ult) App.game.ult(); });
-$('soundBtn').addEventListener('click', () => { muted = !muted; initAudio(); syncUI(); });
-$('musicBtn').addEventListener('click', () => {
+$('soundBtn').addEventListener('click', e => {
+  muted = !muted; initAudio();
+  try { localStorage.setItem('cloudsea-sound', muted ? 'off' : 'on'); } catch (err) {}
+  e.currentTarget.blur();
+  syncUI();
+});
+$('musicBtn').addEventListener('click', e => {
+  e.currentTarget.blur();
   musicOn = !musicOn; initAudio();
   try { localStorage.setItem('cloudsea-music', musicOn ? 'on' : 'off'); } catch (e) {}
   syncUI();
