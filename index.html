@@ -111,6 +111,9 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   #diffDesc { min-height: 0; font-size: 12px; }
   .btn { font-size: 19px; padding: 10px 26px; }
   .keys { font-size: 12px; gap: 4px 10px; }
+  #menuScr .keys { display: none; }
+  #setupScr #diffDesc, #setupScr .pi-link { display: none; }
+  .pinfo { gap: 1px; }
   .lead { font-size: 13px; line-height: 1.45; }
 }
 .eyebrow { margin: 0; font-size: 13px; letter-spacing: 0.18em; color: var(--flare); }
@@ -182,7 +185,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 .stats span:nth-child(even) { color: var(--ink); font-family: var(--display); text-align: right; font-variant-numeric: tabular-nums; }
 .small { margin: 0; font-size: 13px; color: var(--muted); }
 .lead { margin: 0; max-width: 30ch; color: var(--muted); line-height: 1.6; font-size: 15px; }
-#setupScr { gap: 8px; }
+#setupScr, #hangarScr { gap: 8px; }
 .keys {
   list-style: none; margin: 4px 0 0; padding: 0;
   display: grid; grid-template-columns: auto auto; gap: 6px 14px;
@@ -219,6 +222,8 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 .pi-story { font-size: 13px; color: var(--ink); line-height: 1.5; }
 .pi-link { font-size: 12px; color: #ff9fb0; }
 .pi-kit { font-size: 12px; color: #ffd3a8; }
+.pi-rec { font-size: 12px; color: #c9d6ff; font-variant-numeric: tabular-nums; }
+.plane .pend { font-size: 10px; color: #ffd966; min-height: 1.2em; line-height: 1.2; }
 .pinfo .pstat { grid-template-columns: repeat(3, auto auto); justify-content: start; gap: 4px 8px; font-size: 11px; margin-top: 2px; }
 .plane b { font: 15px var(--display); font-weight: 400; }
 .plane .pdesc { font-size: 11px; color: var(--muted); line-height: 1.2; }
@@ -257,8 +262,12 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
         <li><b>정밀 이동</b></li><li>Shift</li>
         <li><b>일시정지</b></li><li>P · Esc</li>
       </ul>
-      <button class="btn" id="startBtn" type="button">출격 준비</button>
-      <p class="small">최고 기록 <span id="best-shooter">0</span> · Enter로 시작</p>
+      <div class="actions">
+        <button class="btn" id="startBtn" type="button">출격 준비</button>
+        <button class="btn ghost" id="resumeRunBtn" type="button" hidden>이어서 출격</button>
+      </div>
+      <p class="small" id="runInfo" hidden></p>
+      <p class="small">최고 기록 <span id="best-shooter">0</span> · 엔딩 <span id="endCount">0</span>/12 · Enter로 시작</p>
     </div>
 
     <div class="overlay" id="pauseScr" hidden>
@@ -285,6 +294,18 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
         <button class="btn ghost" id="setupBackBtn" type="button">뒤로</button>
       </div>
       <p class="small">1~4 조종사 · Enter 출격 · Esc 뒤로</p>
+    </div>
+
+    <div class="overlay" id="hangarScr" hidden>
+      <p class="eyebrow" id="hangarEyebrow">회수 작전</p>
+      <h2>격납고</h2>
+      <div class="planes" id="hangarList"></div>
+      <div class="pinfo" id="hangarInfo"></div>
+      <p class="small" id="hangarNote"></p>
+      <div class="actions">
+        <button class="btn" id="hangarGo" type="button">출격</button>
+      </div>
+      <p class="small">1~3 기체 · Enter 출격</p>
     </div>
 
     <div class="overlay" id="contScr" hidden>
@@ -326,6 +347,60 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const TAU = Math.PI * 2;
 const fmt = n => Math.floor(n).toLocaleString('ko-KR');
 
+/* ================= save data: one versioned object ================= */
+const Save = (() => {
+  const KEY = 'cloudsea-save', VERSION = 1;
+  const PIDS = ['swallow', 'hawk', 'ox', 'owl'], DIDS = ['easy', 'normal', 'hard'];
+  const recKey = (p, d) => PIDS[p] + '-' + DIDS[d];
+  const blank = () => ({ v: VERSION, best: {}, clears: {}, endings: {}, run: null, settings: { plane: 1, diff: 1, music: true, sound: true } });
+  const read = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  let d = blank();
+  try {
+    const raw = read(KEY);
+    if (raw) {
+      const o = JSON.parse(raw);
+      if (o && o.v === VERSION) d = Object.assign(blank(), o, { settings: Object.assign(blank().settings, o.settings) });
+    } else {
+      // first run of this version: carry over the old separate keys
+      const st = JSON.parse(read('cloudsea-setup') || '{}');
+      if (st.plane !== undefined) d.settings.plane = clamp(st.plane | 0, 0, 3);
+      if (st.diff !== undefined) d.settings.diff = clamp(st.diff | 0, 0, 2);
+      d.settings.music = read('cloudsea-music') !== 'off';
+      d.settings.sound = read('cloudsea-sound') !== 'off';
+      const old = +read('cloudsea-best') || 0;
+      if (old > 0) d.best[recKey(d.settings.plane, d.settings.diff)] = { all: old, nc: 0 };
+    }
+  } catch (e) { d = blank(); }
+  const write = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} };
+  write();
+  return {
+    settings: d.settings,
+    set(k, v) { d.settings[k] = v; write(); },
+    best: (p, df) => d.best[recKey(p, df)] || { all: 0, nc: 0 },
+    topAll: () => Object.values(d.best).reduce((m, b) => Math.max(m, b.all), 0),
+    record(p, df, score, nc) {
+      const k = recKey(p, df), b = d.best[k] || { all: 0, nc: 0 };
+      const res = { all: score > b.all, nc: nc && score > b.nc };
+      if (res.all) b.all = score;
+      if (res.nc) b.nc = score;
+      d.best[k] = b; write();
+      return res;
+    },
+    markClear(p, df, nc) {
+      const k = recKey(p, df), c = d.clears[k] || { clear: false, nc: false };
+      c.clear = true; if (nc) c.nc = true;
+      d.clears[k] = c; write();
+    },
+    clears: (p, df) => d.clears[recKey(p, df)] || { clear: false, nc: false },
+    markEnding(pilotId) { d.endings[pilotId] = true; write(); },
+    seenEnding: pilotId => !!d.endings[pilotId],
+    endingCount: () => Object.keys(d.endings).length,
+    get run() { return d.run; },
+    setRun(r) { d.run = r; write(); },
+    clearRun() { if (d.run) { d.run = null; write(); } },
+  };
+})();
+
 /* ================= sizing ================= */
 function fit() {
   const cw = wrap.clientWidth, ch = wrap.clientHeight;
@@ -343,7 +418,7 @@ fit();
 
 /* ================= audio ================= */
 let actx = null, muted = false;
-try { muted = localStorage.getItem('cloudsea-sound') === 'off'; } catch (e) {}
+muted = !Save.settings.sound;
 function initAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
   if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
@@ -384,7 +459,7 @@ function fanfare() { tone(523, 0.18, 'triangle', 0.06); setTimeout(() => tone(65
 
 /* ================= music: three looping chiptunes, synthesized ================= */
 let musicOn = true;
-try { musicOn = localStorage.getItem('cloudsea-music') !== 'off'; } catch (e) {}
+musicOn = Save.settings.music;
 const Music = (() => {
   // each bar: bass root (MIDI) + eight 8th-note lead steps (0 = rest)
   const TRACKS = {
@@ -632,6 +707,11 @@ function drawParts() {
       ctx.fillStyle = 'rgba(20,10,30,0.6)'; ctx.fillText(q.text, q.x + 3, q.y + 4);
       ctx.fillStyle = `rgb(${q.color})`; ctx.fillText(q.text, q.x, q.y);
       ctx.restore();
+    } else if (q.kind === 'vbeam') {
+      const al = Math.min(1, a * 2);
+      ctx.fillStyle = `rgba(${q.color},${0.35 * al})`; ctx.fillRect(q.x - q.w, 0, q.w * 2, H);
+      ctx.fillStyle = `rgba(${q.color},${0.85 * al})`; ctx.fillRect(q.x - q.w / 2, 0, q.w, H);
+      ctx.fillStyle = `rgba(255,255,255,${al})`; ctx.fillRect(q.x - q.w * 0.15, 0, q.w * 0.3, H);
     } else if (q.kind === 'streak') {
       const k = 1 - a, f1 = Math.min(1, k * 2), f0 = Math.max(0, f1 - 0.45);
       const hx = q.x0 + (q.x1 - q.x0) * f1, hy = q.y0 + (q.y1 - q.y0) * f1;
@@ -670,7 +750,7 @@ function drawPlane(x, y, ang, tilt, alpha, prop, look = DEFAULT_LOOK) {
   ctx.save();
   ctx.translate(x, y);
   ctx.save();
-  if (look.noShadow) ctx.globalAlpha = 0;
+  if (look.noShadow || look.kind === 'craft') ctx.globalAlpha = 0;
   ctx.translate(18, 34); ctx.rotate(ang); ctx.scale(0.55 * look.scale, 0.55 * look.scale);
   ctx.fillStyle = 'rgba(30,20,50,0.22)';
   if (look.kind === 'ox') {
@@ -686,7 +766,8 @@ function drawPlane(x, y, ang, tilt, alpha, prop, look = DEFAULT_LOOK) {
   ctx.globalAlpha = alpha;
   ctx.rotate(ang);
   ctx.scale((1 - Math.abs(tilt) * 0.22) * look.scale, look.scale);
-  if (look.kind === 'owl') drawOwl(look, prop);
+  if (look.kind === 'craft') drawCraft(look);
+  else if (look.kind === 'owl') drawOwl(look, prop);
   else if (look.kind === 'swallow') drawSwallow(look, prop);
   else if (look.kind === 'ox') drawOx(look, prop);
   else drawHawk(look, prop);
@@ -806,8 +887,7 @@ function drawOwl(L, prop) {
 function drawBossExtra(e, col, blink, hurt) {
   if (e.type === 'nest') {
     // 까마귀 둥지: black carrier with crow wings, glowing hangar bays and a beak prow
-    ctx.fillStyle = 'rgba(20,10,30,0.28)';
-    ctx.beginPath(); ctx.ellipse(26, 62, 120, 30, 0, 0, TAU); ctx.fill();
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(26, 62, 120, 30, 0, 0, TAU); ctx.fill(); }
     ctx.fillStyle = col('#15131c');
     for (const s of [-1, 1]) for (let i = 0; i < 5; i++) spikeTri(s * (74 + i * 7), -16 + i * 9, s > 0 ? 0.45 : Math.PI - 0.45, 34 - i * 2, 7);
     const g = ctx.createLinearGradient(0, -32, 0, 32);
@@ -864,8 +944,7 @@ function drawBossNew(e, col, blink, hurt) {
   if (e.type === 'beacon') {
     // 길잡이: striped lighthouse ship whose lamp has become a hunting eye
     const spin = e.spin === undefined ? Math.PI / 2 : e.spin, arms = e.arms || 2;
-    ctx.fillStyle = 'rgba(20,10,30,0.28)';
-    ctx.beginPath(); ctx.ellipse(22, 56, 56, 18, 0, 0, TAU); ctx.fill();
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(22, 56, 56, 18, 0, 0, TAU); ctx.fill(); }
     for (let i = 0; i < arms; i++) {
       ctx.save(); ctx.rotate(spin + i * TAU / arms);
       const g = ctx.createLinearGradient(20, 0, 300, 0);
@@ -897,8 +976,7 @@ function drawBossNew(e, col, blink, hurt) {
     if (e.phase2) arcs(0, 0, 54, 2, '255,220,140');
   } else {
     // 먹구름: weather ship buried in its own thundercloud
-    ctx.fillStyle = 'rgba(20,10,30,0.28)';
-    ctx.beginPath(); ctx.ellipse(26, 62, 122, 30, 0, 0, TAU); ctx.fill();
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(26, 62, 122, 30, 0, 0, TAU); ctx.fill(); }
     ctx.strokeStyle = 'rgba(190,210,255,0.45)'; ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let i = 0; i < 14; i++) { const x = -92 + i * 14, y = 34 + ((time * 160 + i * 37) % 50); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 12); }
@@ -937,7 +1015,14 @@ function spikeTri(x, y, ang, len, w) {
   ctx.lineTo(x + Math.cos(ang - Math.PI / 2) * w, y + Math.sin(ang - Math.PI / 2) * w);
   ctx.closePath(); ctx.fill();
 }
+let craftTint = false;
+function lightHex(c) {
+  if (typeof c !== 'string' || !/^#[0-9a-f]{6}$/i.test(c)) return c;
+  const v = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)), w = [244, 246, 255];
+  return '#' + v.map((x, i) => Math.round(x * 0.45 + w[i] * 0.55).toString(16).padStart(2, '0')).join('');
+}
 function glowDot(x, y, r, rgb, a) {
+  if (craftTint) rgb = '120,220,255';
   const g = ctx.createRadialGradient(x, y, 0, x, y, r);
   g.addColorStop(0, `rgba(255,245,230,${a})`);
   g.addColorStop(0.35, `rgba(${rgb},${a})`);
@@ -959,11 +1044,150 @@ function arcs(cx, cy, rad, n, rgb) {
   }
 }
 
+// recovered boss craft: the boss art, shrunk and turned to face up
+function drawCraft(L) {
+  const fake = o => Object.assign({ type: L.type, x: 0, y: 0, t: 0, flash: 0, hp: 1, maxHp: 1, k: 0, burst: 0, spin: time * 2.4, arms: 2, on: false,
+    face: -Math.PI / 2, mode: 'roam', armored: false, launchFx: 0, rot: Math.PI, craft: true }, o);
+  ctx.save();
+  ctx.scale(L.art, L.art);
+  craftTint = true;
+  if (L.type === 'twin') { drawEnemy(fake({ x: -48, k: 1 })); drawEnemy(fake({ x: 48, k: 0 })); }
+  else if (L.type === 'ace') drawEnemy(fake({ rot: 0 }));
+  else drawEnemy(fake({}));
+  craftTint = false;
+  ctx.restore();
+}
+function craftPortrait(c, x, y, r) {
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = '#232844'; ctx.fill(); ctx.clip();
+  drawPlane(x, y + 2, 0, 0, 1, time * 40, Object.assign({}, c.look, { noShadow: true, scale: r / 44 }));
+  ctx.restore();
+  ctx.strokeStyle = c.look.accent; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(x, y, r - 1, 0, TAU); ctx.stroke();
+}
+// 해와 달 as a recovered craft: the blade silhouette, smoothed, in white with a sun or moon crest
+function drawTwinCraft(e) {
+  const tint = craftTint; craftTint = false;
+  const sun = e.k === 0;
+  const C = sun
+    ? { body: '#fffaf0', spine: '#ffe6bf', trim: '#f29a2e', glow: '255,170,60', dark: '#7a4a12' }
+    : { body: '#f4f7ff', spine: '#d6e0ff', trim: '#5f8fea', glow: '140,185,255', dark: '#24356e' };
+  // afterburners
+  const fl = 16 + Math.random() * 8;
+  for (const sx of [-6, 6]) {
+    const g = ctx.createLinearGradient(0, -30, 0, -30 - fl);
+    g.addColorStop(0, 'rgba(255,250,240,0.95)'); g.addColorStop(0.35, `rgba(${C.glow},0.75)`); g.addColorStop(1, `rgba(${C.glow},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.moveTo(sx - 3.5, -30); ctx.lineTo(sx, -30 - fl); ctx.lineTo(sx + 3.5, -30); ctx.closePath(); ctx.fill();
+  }
+  // tail fins
+  ctx.fillStyle = C.trim;
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(s * 11, -22); ctx.quadraticCurveTo(s * 20, -30, s * 25, -42); ctx.lineTo(s * 10, -32); ctx.closePath(); ctx.fill();
+  }
+  // body: the original blade, with curved leading edges
+  ctx.beginPath();
+  ctx.moveTo(0, 48);
+  ctx.quadraticCurveTo(-5, 30, -10, 15);
+  ctx.quadraticCurveTo(-32, 14, -48, 24);
+  ctx.quadraticCurveTo(-46, 12, -38, 6);
+  ctx.lineTo(-14, -9);
+  ctx.quadraticCurveTo(-13, -22, -10, -33);
+  ctx.lineTo(10, -33);
+  ctx.quadraticCurveTo(13, -22, 14, -9);
+  ctx.lineTo(38, 6);
+  ctx.quadraticCurveTo(46, 12, 48, 24);
+  ctx.quadraticCurveTo(32, 14, 10, 15);
+  ctx.quadraticCurveTo(5, 30, 0, 48);
+  ctx.closePath();
+  ctx.fillStyle = C.body; ctx.fill();
+  ctx.strokeStyle = C.trim; ctx.lineWidth = 2.2; ctx.lineJoin = 'round'; ctx.stroke();
+  // wing stripes and tips
+  ctx.strokeStyle = C.trim; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.moveTo(s * 15, 2); ctx.quadraticCurveTo(s * 30, 8, s * 42, 18); ctx.stroke();
+    glowDot(s * 46, 22, 7, C.glow, 0.9);
+  }
+  // spine
+  ctx.fillStyle = C.spine;
+  ctx.beginPath(); ctx.ellipse(0, 6, 6.5, 30, 0, 0, TAU); ctx.fill();
+  // canopy
+  ctx.fillStyle = '#1f2f5a';
+  ctx.beginPath(); ctx.ellipse(0, 22, 4.5, 9, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.beginPath(); ctx.ellipse(-1.4, 25, 1.4, 3.6, 0, 0, TAU); ctx.fill();
+  // crest: a sun disc with rays, or a crescent moon
+  const cy = -16;
+  glowDot(0, cy, 13, C.glow, 0.45);
+  ctx.fillStyle = C.trim;
+  if (sun) {
+    ctx.beginPath(); ctx.arc(0, cy, 5.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = C.trim; ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + time; ctx.moveTo(Math.cos(a) * 7.5, cy + Math.sin(a) * 7.5); ctx.lineTo(Math.cos(a) * 10.5, cy + Math.sin(a) * 10.5); }
+    ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(0, cy, 7, 0, TAU); ctx.arc(3.2, cy - 2, 5.8, 0, TAU, true); ctx.fill('evenodd');
+    ctx.fillStyle = '#ffffff';
+    for (const [x, y] of [[6, -8], [8, -2]]) { ctx.beginPath(); ctx.arc(x, cy + y + 6, 1, 0, TAU); ctx.fill(); }
+  }
+  craftTint = tint;
+}
+function drawCraftPreview(canvas, c) {
+  const saved = ctx;
+  ctx = canvas.getContext('2d');
+  ctx.setTransform(canvas.width / 132, 0, 0, canvas.height / 68, 0, 0);
+  ctx.clearRect(0, 0, 132, 68);
+  drawPlane(66, 34, 0, 0, 1, 0.6, Object.assign({}, c.look, { noShadow: true, scale: 0.8 }));
+  ctx = saved;
+}
+// 무한 복제 공장: the final boss
+function drawFactory(e, col, blink, hurt) {
+  if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(30, 96, 210, 40, 0, 0, TAU); ctx.fill(); }
+  for (const sx of [-130, -70, 70, 130]) {
+    ctx.fillStyle = col('#2a2630'); ctx.fillRect(sx - 11, -100, 22, 52);
+    ctx.fillStyle = '#c4453a'; ctx.fillRect(sx - 11, -94, 22, 6);
+    glowDot(sx, -102, 14, '255,120,60', 0.4 + 0.3 * blink);
+  }
+  const g = ctx.createLinearGradient(0, -60, 0, 60);
+  g.addColorStop(0, '#3c3848'); g.addColorStop(1, '#18161f');
+  ctx.fillStyle = g;
+  rr(-182, -56, 364, 114, 12); ctx.fill();
+  if (e.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,0.22)'; rr(-182, -56, 364, 114, 12); ctx.fill(); }
+  ctx.strokeStyle = e.flash > 0 ? '#fff' : '#7a4fc0'; ctx.lineWidth = 3;
+  rr(-182, -56, 364, 114, 12); ctx.stroke();
+  ctx.fillStyle = col('#c9c2d8');
+  for (const s of [-1, 1]) { spikeTri(s * 182, -30, s > 0 ? 0 : Math.PI, 22, 7); spikeTri(s * 182, 20, s > 0 ? 0 : Math.PI, 22, 7); }
+  ctx.fillStyle = '#4a4558';
+  for (let i = 0; i < 8; i++) ctx.fillRect(-172 + i * 44, -50, 36, 10);
+  for (let i = 0; i < 14; i++) {
+    const on = Math.floor(time * 10 + i) % 14 < 3;
+    ctx.fillStyle = on ? '#ffd36b' : 'rgba(255,211,107,0.2)';
+    ctx.fillRect(-160 + i * 23, -30, 10, 4);
+  }
+  for (const sx of [-112, 0, 112]) {
+    ctx.fillStyle = '#08070c'; rr(sx - 34, 12, 68, 42, 6); ctx.fill();
+    glowDot(sx, 38, 28 + (e.launchFx || 0) * 30, '255,120,40', 0.5 + 0.4 * blink);
+    ctx.fillStyle = col('#5a5468'); ctx.fillRect(sx - 36, 8, 72, 5);
+  }
+  glowDot(0, -10, 46, '255,40,70', 0.6 + 0.4 * blink);
+  ctx.fillStyle = '#ffe9d6';
+  ctx.beginPath(); ctx.ellipse(0, -10, 19, 12, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#c4122f';
+  ctx.beginPath(); ctx.arc(0, -10, 8.5, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(0, -10, 2.6, 7.5, 0, 0, TAU); ctx.fill();
+  if (hurt > 0.5) arcs(0, 0, 150, 3, '255,150,90');
+}
 function drawEnemy(e) {
   ctx.save();
   ctx.translate(e.x, e.y);
   if (e.rot) ctx.rotate(e.rot);
-  const col = base => e.flash > 0 ? '#ffffff' : base;
+  if (e.shadow) {
+    glowDot(0, 0, (e.hw || e.r || 30) * 1.7, '150,80,255', 0.35 + 0.15 * Math.sin(time * 5));
+    ctx.filter = 'grayscale(0.7) brightness(0.6) contrast(1.25)';
+  }
+  const col = base => e.flash > 0 ? '#ffffff' : e.craft ? lightHex(base) : base;
   const blink = 0.6 + 0.4 * Math.sin(time * 8 + e.x);
   const hurt = e.maxHp ? 1 - e.hp / e.maxHp : 0;
   if (e.type === 'scout') {
@@ -1003,6 +1227,8 @@ function drawEnemy(e) {
       ctx.fillStyle = '#ffb347'; ctx.fillRect(-26, -46, 52 * Math.max(0, e.hp / e.maxHp), 4);
     }
 
+  } else if (e.type === 'factory') {
+    drawFactory(e, col, blink, hurt);
   } else if (e.type === 'beacon' || e.type === 'cloud') {
     drawBossNew(e, col, blink, hurt);
   } else if (e.type === 'nest' || e.type === 'ace') {
@@ -1010,8 +1236,7 @@ function drawEnemy(e) {
   } else if (e.type === 'whale') {
     // 구름고래: armored crimson war-blimp with a fanged maw
     const open = e.burst > 0 ? 1 : 0.2 + 0.15 * Math.sin(time * 3);
-    ctx.fillStyle = 'rgba(30,10,30,0.28)';
-    ctx.beginPath(); ctx.ellipse(26, 60, 118, 32, 0, 0, TAU); ctx.fill();
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(26, 60, 118, 32, 0, 0, TAU); ctx.fill(); }
     ctx.fillStyle = col('#24151f');
     ctx.beginPath(); ctx.moveTo(-90, 0); ctx.lineTo(-146, -46); ctx.lineTo(-124, -8); ctx.lineTo(-156, 0); ctx.lineTo(-124, 8); ctx.lineTo(-146, 46); ctx.closePath(); ctx.fill();
     ctx.fillStyle = col('#c9c2d8');
@@ -1052,11 +1277,12 @@ function drawEnemy(e) {
       ctx.beginPath(); ctx.moveTo(px - w, 36); ctx.lineTo(px + w, 36); ctx.stroke();
     }
 
+  } else if (e.type === 'twin' && e.craft) {
+    drawTwinCraft(e);
   } else if (e.type === 'twin') {
     // 쌍둥이: black blade fighters with neon edges and long afterburners
-    const neon = e.k ? '70,200,255' : '255,50,120';
-    ctx.fillStyle = 'rgba(20,10,30,0.25)';
-    ctx.beginPath(); ctx.ellipse(18, 44, 40, 12, 0, 0, TAU); ctx.fill();
+    const neon = e.craft ? (e.k ? '140,190,255' : '255,170,60') : e.k ? '70,200,255' : '255,50,120';
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(18, 44, 40, 12, 0, 0, TAU); ctx.fill(); }
     const fl = (e.enraged ? 40 : 22) + Math.random() * 12;
     for (const sx of [-7, 7]) {
       const g = ctx.createLinearGradient(0, -30, 0, -30 - fl);
@@ -1065,14 +1291,14 @@ function drawEnemy(e) {
       ctx.beginPath(); ctx.moveTo(sx - 4, -30); ctx.lineTo(sx, -30 - fl); ctx.lineTo(sx + 4, -30); ctx.closePath(); ctx.fill();
     }
     if (e.enraged) glowDot(0, 0, 58, neon, 0.18 + 0.12 * blink);
-    ctx.fillStyle = col('#120e18');
+    ctx.fillStyle = e.craft ? (e.flash > 0 ? '#fff' : '#f4f1ff') : col('#120e18');
     ctx.beginPath();
     ctx.moveTo(0, 44); ctx.lineTo(-9, 14); ctx.lineTo(-50, 22); ctx.lineTo(-44, 8); ctx.lineTo(-14, -12);
     ctx.lineTo(-12, -32); ctx.lineTo(12, -32); ctx.lineTo(14, -12); ctx.lineTo(44, 8); ctx.lineTo(50, 22); ctx.lineTo(9, 14);
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = `rgba(${neon},${0.65 + 0.35 * blink})`; ctx.lineWidth = 2; ctx.lineJoin = 'miter';
     ctx.stroke();
-    ctx.fillStyle = col('#241c30');
+    ctx.fillStyle = e.craft ? (e.k ? '#bcd2ff' : '#ffd79a') : col('#241c30');
     ctx.beginPath(); ctx.moveTo(-14, -26); ctx.lineTo(-26, -40); ctx.lineTo(-10, -32); ctx.closePath(); ctx.fill();
     ctx.beginPath(); ctx.moveTo(14, -26); ctx.lineTo(26, -40); ctx.lineTo(10, -32); ctx.closePath(); ctx.fill();
     ctx.fillStyle = `rgb(${neon})`;
@@ -1095,8 +1321,7 @@ function drawEnemy(e) {
 
   } else if (e.type === 'dread') {
     // 폭풍 전함: black-iron warship with a reactor eye under a storm shield
-    ctx.fillStyle = 'rgba(20,10,30,0.3)';
-    ctx.beginPath(); ctx.ellipse(26, 72, 126, 34, 0, 0, TAU); ctx.fill();
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(26, 72, 126, 34, 0, 0, TAU); ctx.fill(); }
     for (const ex of [-84, -42, 42, 84]) {
       const fl = 18 + Math.random() * 10;
       const g = ctx.createLinearGradient(0, -38, 0, -38 - fl);
@@ -1137,8 +1362,7 @@ function drawEnemy(e) {
 
   } else if (e.type === 'boss') {
     // 공중 요새: spiked iron fortress with a rotating blade ring around a burning eye
-    ctx.fillStyle = 'rgba(20,10,30,0.28)';
-    ctx.beginPath(); ctx.ellipse(26, 62, 96, 30, 0, 0, TAU); ctx.fill();
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(26, 62, 96, 30, 0, 0, TAU); ctx.fill(); }
     ctx.fillStyle = col('#c9c2d8');
     for (const s of [-1, 1]) { spikeTri(s * 112, -8, s > 0 ? -0.3 : Math.PI + 0.3, 22, 6); spikeTri(s * 112, 8, s > 0 ? 0.3 : Math.PI - 0.3, 22, 6); }
     ctx.fillStyle = col('#221a2e');
@@ -1196,6 +1420,15 @@ function drawPlayerBullets(list) {
       ctx.fillStyle = 'rgba(255,190,110,0.7)'; ctx.beginPath(); ctx.moveTo(-2.5, 6); ctx.lineTo(0, 14 + Math.random() * 5); ctx.lineTo(2.5, 6); ctx.fill();
       ctx.fillStyle = '#5fd0ff'; rr(-2.5, -7, 5, 13, 2.5); ctx.fill();
       ctx.fillStyle = '#e8f8ff'; ctx.beginPath(); ctx.arc(0, -5, 2, 0, TAU); ctx.fill();
+      ctx.restore();
+      continue;
+    }
+    if (b.style === 'pink' || b.style === 'cyan' || b.style === 'lamp' || b.style === 'drop' || b.style === 'orb') {
+      const c = { pink: ['255,110,170', '#ffe0ee'], cyan: ['90,200,255', '#e0f6ff'], lamp: ['255,220,110', '#fff6d0'], drop: ['140,190,255', '#eaf4ff'], orb: ['255,170,90', '#fff0d8'] }[b.style];
+      ctx.fillStyle = `rgba(${c[0]},0.4)`;
+      if (b.style === 'orb') { ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill(); ctx.fillStyle = c[1]; ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, TAU); ctx.fill(); }
+      else if (b.style === 'drop') { ctx.beginPath(); ctx.ellipse(0, 0, 3, 9, 0, 0, TAU); ctx.fill(); ctx.fillStyle = c[1]; ctx.beginPath(); ctx.ellipse(0, -1, 1.4, 5, 0, 0, TAU); ctx.fill(); }
+      else { rr(-3, -10, 6, 20, 3); ctx.fill(); ctx.fillStyle = c[1]; rr(-1.4, -8, 2.8, 16, 1.4); ctx.fill(); }
       ctx.restore();
       continue;
     }
@@ -1300,6 +1533,10 @@ function moveInput() {
 
 /* ================= story: 돌아오지 않은 편대 ================= */
 const BOSS_INFO = {
+  factory: { name: '무한 복제 공장', title: '최종 목표', lastName: '무한 복제 공장',
+    story: '쓰러진 기체의 그림자를 끝없이 찍어 내는 구름바다 밑바닥의 공장.',
+    intro: '원본 기체 감지. 복제를 시작합니다. 복제를 시작합니다.',
+    last: '…생산 라인, 정지.' },
   beacon: { name: '길잡이', title: '등대선',
     story: '구름바다의 항로를 밝히던 등대 비행선. 이제 그 불빛은 길이 아니라 표적을 찾는다.',
     intro: '항로를 이탈했습니다. 추락 지점까지… 안내하겠습니다.',
@@ -1474,7 +1711,7 @@ function drawRadioIcon(cx, cy, r) {
   ctx.strokeStyle = '#9fb0e0'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 0, 29, 0, TAU); ctx.stroke();
   ctx.restore();
 }
-const BOSS_ICON_SCALE = { beacon: 0.5, cloud: 0.3, whale: 0.3, twin: 0.62, nest: 0.3, boss: 0.3, ace: 0.8, dread: 0.26 };
+const BOSS_ICON_SCALE = { factory: 0.15, beacon: 0.5, cloud: 0.3, whale: 0.3, twin: 0.62, nest: 0.3, boss: 0.3, ace: 0.8, dread: 0.26 };
 function drawBossIcon(type, cx, cy, r) {
   ctx.save();
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU);
@@ -1532,12 +1769,12 @@ const PLANES = [
   { id: 'swallow', name: '제비', speed: 380, slow: 180, hp: 4, dmg: 0.8, hit: 3,
     weapon: 'needle', weaponName: '연사 바늘', bomb: 'storm', bombName: '번개 폭풍',
     pilot: { id: 'narae', name: '한나래', link: 'whale', story: '새벽 편대 정비사의 딸. 구름고래에 탔던 어머니의 마지막 무전을 찾아 조종간을 잡았다.' },
-    look: { kind: 'swallow', accent: '#3fa7ff', wing: '#e3ecf5', body: '#f4f8fc', scale: 0.95 }, stats: [5, 2, 2] },
+    look: { kind: 'swallow', accent: '#3fa7ff', wing: '#e3ecf5', body: '#f4f8fc', scale: 0.95 }, stats: [5, 2, 4] },
   { id: 'hawk', name: '매', speed: 310, slow: 150, hp: 5, dmg: 1, hit: 4,
     weapon: 'spread', weaponName: '확산탄', bomb: 'fire', bombName: '화염 융단',
     pilot: { id: 'maru', name: '강마루', link: 'twin', story: '새벽 편대의 유일한 생환자. 혼자 돌아온 3년을 끝내려고 다시 출격한다.' },
-    look: { kind: 'hawk', accent: '#ff8a3d', wing: '#efe3c8', body: '#fbf4e6', scale: 1 }, stats: [3, 3, 3] },
-  { id: 'ox', name: '황소', speed: 250, slow: 125, hp: 7, dmg: 1.4, hit: 5,
+    look: { kind: 'hawk', accent: '#ff8a3d', wing: '#efe3c8', body: '#fbf4e6', scale: 1 }, stats: [3, 3, 4] },
+  { id: 'ox', name: '황소', speed: 250, slow: 125, hp: 7, dmg: 1.25, hit: 5,
     weapon: 'cannon', weaponName: '관통 포탄', bomb: 'shock', bombName: '대지 충격파',
     pilot: { id: 'bawi', name: '도바위', link: 'boss', story: '수호 요새 방패별을 설계한 기술자. 자기가 만든 것을 자기 손으로 부수러 간다.' },
     look: { kind: 'ox', accent: '#d84f4f', wing: '#d9cdb0', body: '#ece2cc', scale: 1 }, stats: [2, 5, 4] },
@@ -1553,6 +1790,92 @@ const DIFFS = [
 ];
 const SUBS = { M: '유도탄', L: '레이저', S: '산탄' };
 const BOSS_ORDER = ['whale', 'twin', 'beacon', 'nest', 'cloud', 'boss', 'ace', 'dread'];
+/* ================= part 2: recovered boss craft ================= */
+// look.kind 'craft' draws the boss art (look.type) shrunk by look.art and turned to face up
+const CRAFTS = [
+  { id: 'c_twin', type: 'twin', name: '해와 달', ga: '가', title: '쌍둥이 전투기', speed: 340, slow: 165, hp: 6, dmg: 1, hit: 4,
+    weapon: 'twin', weaponName: '교차 사격', bomb: 'eclipse', bombName: '일식', ult: 'crossfire', ultName: '쌍둥이 돌격',
+    story: '새벽 편대 2번기와 3번기. 둘이 함께 날며 양쪽에서 교차 사격을 퍼붓는다.',
+    look: { kind: 'craft', type: 'twin', art: 0.46, accent: '#ffb347', scale: 1 }, stats: [4, 4, 5],
+    ending: { title: '나란히 선 두 기체', sky: ['#2a3a6e', '#d07a8e', '#ffd2a0'], text: [
+      '해와 달은 새벽 편대 2번기와 3번기의 자리로 돌아갔다.',
+      '격납고 맨 끝, 두 기체는 언제나 나란히 세워져 있다.',
+      '출격 신호가 울리면, 둘은 지금도 동시에 시동을 건다.'] } },
+  { id: 'c_beacon', type: 'beacon', name: '길잡이', ga: '가', title: '등대선', speed: 300, slow: 150, hp: 6, dmg: 1, hit: 4,
+    weapon: 'lamp', weaponName: '회전 등불', bomb: 'flash', bombName: '등대 섬광', ult: 'searchlight', ultName: '항로 안내',
+    story: '항로를 밝히던 등대선. 좌우로 훑는 등불 탄을 쏘고, 섬광으로 적을 잠시 멈춰 세운다.',
+    look: { kind: 'craft', type: 'beacon', art: 0.5, accent: '#ffd966', scale: 1 }, stats: [3, 4, 4],
+    ending: { title: '돌아가는 길의 불빛', sky: ['#1d2b4f', '#3f6f9e', '#f5d58a'], text: [
+      '길잡이는 다시 등대가 되었다.',
+      '그 불빛은 이제 표적이 아니라, 돌아오는 길을 비춘다.',
+      '구름바다의 조종사들은 길잡이를 보고 집으로 향한다.'] } },
+  { id: 'c_nest', type: 'nest', name: '까마귀 둥지', ga: '가', title: '보급 모함', speed: 290, slow: 145, hp: 6, dmg: 1, hit: 5,
+    weapon: 'drone', weaponName: '호위 무인기', bomb: 'drones', bombName: '무인기 출격', ult: 'swarm', ultName: '둥지 총출격',
+    story: '보급 모함. 주위를 도는 무인기들이 적을 쫓아가 쏜다. 화력이 오를수록 무인기가 늘어난다.',
+    look: { kind: 'craft', type: 'nest', art: 0.3, accent: '#c9a3ff', scale: 1 }, stats: [3, 4, 5],
+    ending: { title: '기다림의 끝', sky: ['#2b2a3a', '#6a5a8a', '#e8b07a'], text: [
+      '까마귀 둥지의 생산 설비가 멈췄다.',
+      '빈 격납고에는 이제 무인기 대신 새 조종사들의 기체가 들어선다.',
+      '둥지는 더 이상 기다리지 않는다. 돌아온 이들이 여기 있으니까.'] } },
+  { id: 'c_cloud', type: 'cloud', name: '먹구름', ga: '이', title: '기상 관측선', speed: 300, slow: 150, hp: 6, dmg: 1, hit: 4,
+    weapon: 'rain', weaponName: '소나기 연사', bomb: 'thunder', bombName: '벼락 기둥', ult: 'front', ultName: '폭풍 전선',
+    story: '기상 관측선. 곧게 뻗는 빗줄기 탄을 여러 줄로 퍼부어 넓은 폭을 한꺼번에 쓸어 낸다.',
+    look: { kind: 'craft', type: 'cloud', art: 0.3, accent: '#9fc6ff', scale: 1 }, stats: [3, 4, 4],
+    ending: { title: '내일은 맑음', sky: ['#4f7fc0', '#9fd0f0', '#fff4dc'], text: [
+      '먹구름은 기상 관측선으로 돌아갔다.',
+      '매일 아침, 편대에 날씨를 알려 주는 목소리가 다시 들린다.',
+      '오늘의 예보는 맑음. 이번에는 정말로.'] } },
+  { id: 'c_fortress', type: 'boss', name: '방패별', ga: '이', title: '수호 요새', speed: 230, slow: 120, hp: 8, dmg: 1.1, hit: 5,
+    weapon: 'spiral', weaponName: '요새 주포', bomb: 'shield', bombName: '반사 방패', ult: 'barrage', ultName: '요새 포격',
+    story: '수호 요새. 가장 느리지만 가장 단단하다. 적을 꿰뚫고 터지는 주포를 쏘고, 탄을 튕겨 내는 방패를 편다.',
+    look: { kind: 'craft', type: 'boss', art: 0.28, accent: '#ff8a6d', scale: 1 }, stats: [1, 5, 4],
+    ending: { title: '사람이 정하는 방패', sky: ['#3a4a7a', '#c98a6a', '#ffe0a8'], text: [
+      '방패별은 도시 위로 돌아가 다시 방패가 되었다.',
+      '이번에는 사람이 조종석에 앉아, 무엇을 지킬지 정한다.',
+      '도시의 아이들은 가장 밝은 별을 방패별이라 부른다.'] } },
+  { id: 'c_ace', type: 'ace', name: '새벽별', ga: '이', title: '편대장기', speed: 410, slow: 190, hp: 5, dmg: 1.1, hit: 3,
+    weapon: 'burst', weaponName: '정밀 점사', bomb: 'dash', bombName: '새벽 돌진', ult: 'dawnrun', ultName: '새벽 비행',
+    story: '편대장 윤하늘의 기체. 가장 빠르고, 짧게 끊어 쏘는 점사가 정확하다.',
+    look: { kind: 'craft', type: 'ace', art: 0.8, accent: '#ffd966', scale: 1 }, stats: [5, 3, 4],
+    ending: { title: '하루뿐인 비행', sky: ['#1a1d3f', '#6a4a8a', '#ffc8a0'], text: [
+      '새벽별은 편대장 윤하늘의 이름과 함께 기념관에 놓였다.',
+      '단 하루, 새벽 편대가 만들어진 날에만 그 엔진에 불이 붙는다.',
+      '그날 하늘에는 언제나 하얀 비행운 한 줄이 그어진다.'] } },
+  { id: 'c_dread', type: 'dread', name: '폭풍눈', ga: '이', title: '통제함', speed: 280, slow: 140, hp: 7, dmg: 1.2, hit: 5,
+    weapon: 'storm', weaponName: '번개 지휘', bomb: 'tempest', bombName: '대폭풍', ult: 'fleet', ultName: '함대 지휘',
+    story: '함대의 두뇌였던 통제함. 번개로 가장 가까운 적을 직접 내리치고, 은퇴한 기체들을 불러 모은다.',
+    look: { kind: 'craft', type: 'dread', art: 0.27, accent: '#b48cff', scale: 1 }, stats: [3, 5, 5],
+    ending: { title: '태풍의 눈, 고요', sky: ['#20263a', '#4a6a8a', '#cfe8ff'], text: [
+      '폭풍눈의 통제 장치는 영원히 꺼졌다.',
+      '남은 선체는 태풍을 막는 원래의 임무로 돌아갔다.',
+      '폭풍이 오는 계절, 구름바다는 이제 조금 덜 무섭다.'] } },
+];
+const CRAFT_ORDER = CRAFTS.map(c => c.id);
+const craftById = id => CRAFTS.find(c => c.id === id);
+const PART2 = {
+  intro: [['관제탑', '폭풍눈의 기록에서 새 신호가 잡혔다. 구름바다 밑바닥, 무한 복제 공장.'],
+          ['정비반', '회수한 보스 기체 일곱 대의 통제 장치를 모두 떼어 냈다. 이제 우리 편이다.'],
+          ['관제탑', '공장은 쓰러진 기체의 그림자를 끝없이 찍어 낸다. 회수한 기체로 그림자 함대를 뚫어라.']],
+  pilot: { narae: '엄마 배 말고는 다 데려왔네. 좋아, 같이 가자.', maru: '빼앗긴 기체로 빼앗긴 하늘을 되찾는다. 나쁘지 않군.',
+           bawi: '정비는 끝났다. 이제 제 몫을 할 차례다.', saebyeok: '언니가 멈춘 함대야. 끝은 우리가 낸다.' },
+  ownShadow: c => `그림자 ${c.name} 확인. 네가 탄 기체의 복제판이다. 저걸 넘어야 ${c.name}${c.ga} 완전히 자유로워진다.`,
+  shadowDown: c => `그림자 ${c.name} 소멸. ${c.name}의 통제 기록이 완전히 지워졌다.`,
+  thanks: c => `${c.name}, 고마웠어. 이제 집에 가서 쉬어.`,
+  final: [['관제탑', '회수한 기체는 모두 제자리로 돌아갔다.'], ['관제탑', '마지막 출격은 처음 그 기체로. 복제 공장까지 네 구간 남았다.']],
+  finalPilot: { narae: '처음 탔던 제비로 끝낼게. 제일 빠르게.', maru: '처음 그 매로 간다. 끝은 늘 처음처럼.',
+                bawi: '황소, 마지막까지 버텨 줘라.', saebyeok: '올빼미, 이제 새벽을 보러 가자.' },
+  factoryPilot: { narae: '여기서 다 만들어졌던 거구나. 끝내자!', maru: '새벽 편대, 마지막 목표다. 전원 따라와라!',
+                  bawi: '저 생산 라인, 내 손으로 멈춘다.', saebyeok: '신호의 끝이 여기야. 언니, 보고 있어?' },
+  wallDown: '외벽 붕괴 확인! 새벽 편대 전 기체, 복제 공장에 폭격 개시!',
+  factoryGone: '복제 공장 완전 파괴. 그림자 신호, 영구 소멸.',
+  lastWord: { narae: '엄마, 하늘이 조용해. 이제 정말 집에 갈게.', maru: '새벽 편대, 이번엔 정말 전원 귀환이다.',
+              bawi: '부순 건 여기까지. 이제 지을 차례다.', saebyeok: '언니, 끝났어. 새벽이야.' },
+};
+const FINAL_ENDING = { title: '새벽이 온 하늘', sky: ['#2a3f7a', '#f0a070', '#fff0c8'], text: [
+  '복제 공장이 무너지고, 구름바다 밑바닥까지 빛이 닿았다.',
+  '되찾은 기체들은 저마다의 자리로 돌아갔고, 새벽 편대는 다시 여덟 칸을 채웠다.',
+  '이 하늘은 이제 누구의 것도 아닌, 모두의 하늘이다.'] };
+
 
 function makeShooter() {
   const STAGE_LEN = 48, SUB_DUR = 12;
@@ -1562,16 +1885,21 @@ function makeShooter() {
     gunner: { hp: 8,  r: 18, score: 280, drop: 0.32 },
     heavy:  { hp: 24, r: 30, score: 650, drop: 0.7 },
   };
-  const ENTER = { beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
+  const ENTER = { factory: [150, 45], beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
-  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT;
-  const grow = () => Math.min(stageNo - 1, 16);
+  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow;
+  const grow = () => {
+    const g = stageNo - 1;
+    if (!camp || camp.act === 1) return Math.min(g, 16);
+    if (camp.act === 2 || camp.act === 3) return 7 + (stageNo - 9) * 0.2;   // stage 9 = stage 8, stage 40 ~ stage 14
+    return Math.min(40, 13.4 + (stageNo - 41) * 0.25);
+  };
   const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet;
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
   const turretsLeft = () => enemies.some(o => o.type === 'turret' && !o.dead);
   const later = (delay, fn) => timers.push({ t: delay, fn });
-  const storyOn = () => stageNo <= BOSS_ORDER.length;
-  const bossLabel = () => BOSS_INFO[bossKind].title + ' ' + BOSS_INFO[bossKind].name;
+  const storyOn = () => camp.act === 1;
+  const bossLabel = () => (bossShadow ? '그림자 ' : '') + BOSS_INFO[bossKind].title + ' ' + BOSS_INFO[bossKind].name;
   function addScore(n, x, y) {
     const v = Math.round(n * D.score);
     score += v;
@@ -1602,7 +1930,16 @@ function makeShooter() {
   function startStage() {
     stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false; ultReady = true;
     setSky(stageNo - 1);
-    showBanner('STAGE ' + stageNo, sky.name + ' 하늘', 2.4);
+    const sub = camp.act === 2 ? `회수 작전 ${camp.chapter}/${CRAFTS.length} · ${craftById(camp.craft).name} · ${camp.chStage + 1}/4 구간`
+      : camp.act === 3 ? `마지막 출격 · ${camp.chStage + 1}/4 구간` : camp.act === 4 ? '무한 모드 · ' + sky.name + ' 하늘' : sky.name + ' 하늘';
+    showBanner('STAGE ' + stageNo, sub, 2.4);
+    if (stageNo === 1) for (const t of [10, 25]) later(t, () => {
+      if (player.dead || player.power >= 5) return;
+      const x = rand(90, W - 90);
+      dropItem(x, 60, 'P');
+      parts.push({ kind: 'ring', x, y: 60, life: 0.5, max: 0.5, size: 50, color: '255,200,120' });
+      floatText(x, 40, '보급', '255,220,160');
+    });
   }
   function addEnemy(type, o) {
     const b = ETYPES[type];
@@ -1635,11 +1972,11 @@ function makeShooter() {
   function spawnBoss() {
     bossSpawned = true;
     bossItemT = 6; escortT = 1; heavyT = 6;
-    bossKind = BOSS_ORDER[(stageNo - 1) % BOSS_ORDER.length];
+    const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow;
     const m = (1 + 0.08 * grow()) * D.ehp;
     const mk = (type, hp, o) => {
       hp = Math.round(hp * m);
-      const e = Object.assign({ type, t: 0, mt: 0, flash: 0, isBoss: true, dead: false, hp, maxHp: hp, fireT: 1.6, fire2: 1.5, spin: 0, arrived: false }, o);
+      const e = Object.assign({ type, t: 0, mt: 0, flash: 0, isBoss: true, dead: false, shadow: bossShadow, hp, maxHp: hp, fireT: 1.6, fire2: 1.5, spin: 0, arrived: false }, o);
       enemies.push(e);
       return e;
     };
@@ -1655,6 +1992,8 @@ function makeShooter() {
       mk('cloud', 900, { x: W / 2, y: -90, hw: 100, hh: 34, r: 40, rainT: 1, ltT: 3, fireT: 2, score: 5000 });
     } else if (bossKind === 'boss') {
       mk('boss', 920, { x: W / 2, y: -110, hw: 70, hh: 34, r: 48, beamT: 3, freeze: 0, score: 5000 });
+    } else if (bossKind === 'factory') {
+      mk('factory', 1500, { x: W / 2, y: -120, hw: 172, hh: 56, r: 60, launchT: 1.5, launchFx: 0, beamT: 4, fireT: 2, fire2: 2.5, score: 20000 });
     } else if (bossKind === 'ace') {
       mk('ace', 780, { x: W / 2, y: -60, r: 24, mode: 'roam', pickT: 0, tx: W / 2, ty: 150, burst: 0, burstT: 0, dashT: 4, face: Math.PI / 2, score: 5500 });
     } else {
@@ -1677,6 +2016,11 @@ function makeShooter() {
     if (storyOn() && !player.dead) {
       const info = BOSS_INFO[bossKind];
       startScene([radioLine(info.story, '기록 · ' + bossLabel()), bossLine(info.intro), pilotLine(PILOT_LINES[P.pilot.id][bossKind][0])], null);
+    } else if (camp.act === 2 && camp.chStage >= 3 && !player.dead) {
+      startScene([radioLine(PART2.ownShadow(craftById(camp.craft)))], null);
+    } else if (bossKind === 'factory' && !player.dead) {
+      const info = BOSS_INFO.factory;
+      startScene([radioLine(info.story, '기록 · ' + bossLabel()), bossLine(info.intro), pilotLine(PART2.factoryPilot[P.pilot.id])], null);
     }
   }
   function enrage(e) {
@@ -1719,7 +2063,7 @@ function makeShooter() {
   function launchMissiles(pairs) {
     const p = player;
     for (const s of [-1, 1]) for (let j = 0; j < pairs; j++) {
-      pb.push({ x: p.x + s * (18 + j * 8), y: p.y, h: -Math.PI / 2 + s * (0.7 + j * 0.35), vx: 0, vy: 0, ang: 0, dmg: 2 * P.dmg, homing: true, life: 2.2 });
+      pb.push({ x: p.x + s * (18 + j * 8), y: p.y, h: -Math.PI / 2 + s * (0.7 + j * 0.35), vx: 0, vy: 0, ang: 0, dmg: (P.weapon === 'homing' ? 3 : 2) * P.dmg, homing: true, life: 2.2 });
     }
     tone(520, 0.06, 'triangle', 0.015, 300);
   }
@@ -1746,6 +2090,51 @@ function makeShooter() {
       else { C(-14, -0.04); C(0, 0); C(14, 0.04); C(-22, -0.18); C(22, 0.18); }
       p.cd = 0.22;
       tone(160, 0.08, 'square', 0.02, 80);
+    } else if (P.weapon === 'twin') {
+      // 교차 사격: both fighters fire, converging slightly, plus a centre line from level 2
+      const n = [1, 1, 2, 2, 3][lv - 1], m = [0, 1, 1, 2, 2][lv - 1];
+      for (const s of [-1, 1]) for (let i = 0; i < n; i++) {
+        const a = -s * 0.03 + (i - (n - 1) / 2) * 0.06;
+        pb.push({ x: p.x + s * 22, y: p.y - 18, vx: Math.sin(a) * 900, vy: -Math.cos(a) * 900, dmg: 1.15 * P.dmg, ang: a, style: s < 0 ? 'pink' : 'cyan' });
+      }
+      for (let i = 0; i < m; i++) pb.push({ x: p.x + (i - (m - 1) / 2) * 8, y: p.y - 24, vx: 0, vy: -900, dmg: 1.15 * P.dmg, ang: 0 });
+      p.cd = 0.085;
+    } else if (P.weapon === 'lamp') {
+      // 회전 등불: a forward fan that sways gently
+      const n = lv + 2, c = Math.sin(time * 2.4) * 0.07;
+      for (let i = 0; i < n; i++) {
+        const a = c + (i - (n - 1) / 2) * 0.04;
+        pb.push({ x: p.x, y: p.y - 22, vx: Math.sin(a) * 860, vy: -Math.cos(a) * 860, dmg: 1.1 * P.dmg, ang: a, style: 'lamp' });
+      }
+      p.cd = 0.085;
+    } else if (P.weapon === 'drone' || P.weapon === 'storm') {
+      const B = dx => pb.push({ x: p.x + dx, y: p.y - 24, vx: 0, vy: -860, dmg: P.dmg, ang: 0, style: P.weapon === 'storm' ? 'lamp' : undefined });
+      B(-6); B(6);
+      if (lv >= 3) { B(-15); B(15); }
+      p.cd = P.weapon === 'storm' ? 0.09 : 0.1;
+    } else if (P.weapon === 'rain') {
+      // 소나기 연사: straight parallel streams across the full screen height
+      const n = [3, 3, 4, 5, 6][lv - 1];
+      for (let i = 0; i < n; i++) {
+        const off = (i - (n - 1) / 2), a = off * 0.02;
+        pb.push({ x: p.x + off * 11, y: p.y - 20, vx: Math.sin(a) * 950, vy: -Math.cos(a) * 950, dmg: 1.1 * P.dmg, ang: a, style: 'drop' });
+      }
+      p.cd = 0.075;
+    } else if (P.weapon === 'spiral') {
+      // 요새 주포: fast heavy shells that pierce one enemy and burst
+      const C = (dx, ang, big = true) => pb.push({ x: p.x + dx, y: p.y - 24, vx: Math.sin(ang) * 850, vy: -Math.cos(ang) * 850, dmg: (big ? 2.6 : 1.6) * P.dmg, ang, style: 'shell', big, pierce: 1, hits: new Set(), splash: big ? 30 : 0 });
+      if (lv === 1) C(0, 0);
+      else if (lv === 2) { C(-10, 0); C(10, 0); }
+      else if (lv === 3) { C(-14, 0); C(0, 0); C(14, 0); }
+      else if (lv === 4) { C(-14, 0); C(0, 0); C(14, 0); C(-20, -0.12, false); }
+      else { C(-14, 0); C(0, 0); C(14, 0); C(-20, -0.12, false); C(20, 0.12, false); }
+      p.cd = 0.15;
+      tone(170, 0.07, 'square', 0.018, 90);
+    } else if (P.weapon === 'burst') {
+      const n = [2, 2, 3, 3, 4][lv - 1];
+      for (let i = 0; i < n; i++) pb.push({ x: p.x + (i - (n - 1) / 2) * 8, y: p.y - 26, vx: 0, vy: -1100, dmg: 1.7 * P.dmg, ang: 0, style: 'needle' });
+      p.burstN = (p.burstN || 0) + 1;
+      p.cd = p.burstN % 3 ? 0.05 : 0.15;
     } else if (P.weapon === 'homing') {
       const B = dx => pb.push({ x: p.x + dx, y: p.y - 24, vx: 0, vy: -760, dmg: 0.8 * P.dmg, ang: 0 });
       B(-6); B(6);
@@ -1886,16 +2275,15 @@ function makeShooter() {
     beams = beams.filter(b => b.warn <= 0);
     if (coins) later(0.3, () => addScore(coins * 10, player.x, player.y - 60));
     player.inv = Math.max(player.inv, 1.8);
-    if (P.bomb === 'storm') stormBomb();
-    else if (P.bomb === 'shock') shockBomb();
-    else if (P.bomb === 'meteor') meteorBomb();
-    else fireBomb();
+    const BOMBS = { storm: stormBomb, shock: shockBomb, meteor: meteorBomb, eclipse: eclipseBomb, flash: flashBomb, drones: dronesBomb, thunder: thunderBomb, shield: shieldBomb, dash: dashBomb, tempest: tempestBomb };
+    (BOMBS[P.bomb] || fireBomb)();
     later(0.25, () => { eb = []; });
     later(0.6, () => { eb = []; });
   }
 
   /* ---- squadron special: all four planes, once per stage ---- */
-  const ULT_NAME = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
+  const ULT_NAME = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈',
+    crossfire: '쌍둥이 돌격', searchlight: '항로 안내', swarm: '둥지 총출격', front: '폭풍 전선', barrage: '요새 포격', dawnrun: '새벽 비행', fleet: '함대 지휘' };
   const ULT_T0 = 0.8, ULT_T1 = 2.6;
   let windNow = 0;
   function ultHit(bossDmg, dmg) {
@@ -1907,15 +2295,18 @@ function makeShooter() {
     if (App.mode !== 'play' || scene || ending || ult || !ultReady || player.dead) return;
     initAudio();
     ultReady = false;
-    const slots = [[-78, 34], [78, 34], [0, 78]];
-    ult = { t: 0, kind: P.id, tick: 0, done: false, sy: player.y, netY: player.y, bomb: 0, orb: 0, ang: 0,
-      allies: PLANES.filter(pl => pl !== P).map((pl, i) => ({ look: pl.look, x: player.x + slots[i][0], y: H + 80 + i * 30, sx: slots[i][0], sy: slots[i][1], i })) };
+    const kind = P.ult || P.id;
+    let mates = PLANES.filter(pl => pl.pilot.id !== P.pilot.id).map(pl => pl.look);
+    if (kind === 'fleet' && camp.done.length) mates = camp.done.map(id => craftById(id).look);
+    const slots = mates.map((_, i) => i < 3 ? [[-78, 34], [78, 34], [0, 78]][i] : [(i % 2 ? 1 : -1) * (70 + i * 14), 60 + i * 8]);
+    ult = { t: 0, kind, tick: 0, done: false, sy: player.y, netY: player.y, bomb: 0, orb: 0, ang: 0,
+      allies: mates.map((look, i) => ({ look, x: player.x + slots[i][0], y: H + 80 + i * 30, sx: slots[i][0], sy: slots[i][1], i })) };
     for (const b of eb) spark(b.x, b.y, '255,230,160', 2, 80);
     eb = [];
     player.inv = Math.max(player.inv, 4);
     flashColor = '255,235,170'; flashT = 0.3;
     parts.push({ kind: 'bigtext', x: W / 2, y: H * 0.3, vx: 0, vy: -12, life: 1.6, max: 1.6, text: '편대 필살기', color: '255,217,102' });
-    parts.push({ kind: 'bigtext', x: W / 2, y: H * 0.3 + 48, vx: 0, vy: -12, life: 1.6, max: 1.6, text: ULT_NAME[P.id], color: '255,245,220' });
+    parts.push({ kind: 'bigtext', x: W / 2, y: H * 0.3 + 48, vx: 0, vy: -12, life: 1.6, max: 1.6, text: ULT_NAME[kind], color: '255,245,220' });
     fanfare();
   }
   function updateUlt(dt) {
@@ -2005,6 +2396,91 @@ function makeShooter() {
         later(0.22, () => { for (let i = 0; i < 8; i++) { const an = i / 8 * TAU; explode(cx + Math.cos(an) * 140, cy + Math.sin(an) * 140, 1.5); } });
         later(0.45, () => { for (let i = 0; i < 12; i++) { const an = i / 12 * TAU + 0.3; explode(cx + Math.cos(an) * 270, cy + Math.sin(an) * 270, 1.2); } flashColor = '255,200,140'; flashT = 0.3; });
       }
+    } else if (u.kind === 'crossfire') {
+      // 해와 달: the wingmen weave a figure eight and cross-fire through every enemy
+      u.allies.forEach((a, i) => { const ph = t * 2.6 + i * 2.1; to(a, W / 2 + Math.cos(ph) * 170, H * 0.42 + Math.sin(ph * 2) * 110, 9); });
+      if (tick) {
+        ultHit(12, 70);
+        for (const e of enemies) {
+          const s = u.allies[Math.floor(Math.random() * u.allies.length)];
+          parts.push({ kind: 'streak', x0: s.x, y0: s.y, x1: e.x, y1: e.y, life: 0.25, max: 0.25, color: Math.random() < 0.5 ? '255,80,150' : '80,200,255' });
+          spark(e.x, e.y, '255,200,230', 6, 200);
+        }
+        for (const a of u.allies) parts.push({ kind: 'wave', x: a.x, y: a.y, life: 0.35, max: 0.35, size: 140, color: '255,120,190' });
+        flashColor = '255,150,200'; flashT = Math.max(flashT, 0.12);
+        tone(900 + Math.random() * 300, 0.08, 'square', 0.03, 400); boom(0.2, 0.1, 2400);
+      }
+    } else if (u.kind === 'searchlight') {
+      // 길잡이: four searchlights swing out from the player and sweep the sky
+      u.allies.forEach((a, i) => to(a, p.x + [-90, 90, 0][i % 3], p.y + [20, 20, 70][i % 3], 7));
+      u.orb = Math.min(1, k * 5); u.ang = t * 2.2;
+      if (tick) {
+        ultHit(12, 70);
+        for (const e of enemies) spark(e.x, e.y, '255,240,180', 8, 220);
+        parts.push({ kind: 'wave', x: p.x, y: p.y, life: 0.5, max: 0.5, size: 500, color: '255,230,140' });
+        flashColor = '255,240,180'; flashT = Math.max(flashT, 0.1);
+        tone(700 + u.tick * 40, 0.15, 'sine', 0.05, 1400);
+      }
+    } else if (u.kind === 'swarm') {
+      // 까마귀 둥지: the wingmen launch drone swarms at every enemy
+      u.allies.forEach((a, i) => to(a, 90 + i * 150, H * 0.62, 7));
+      if (tick) {
+        ultHit(12, 70);
+        for (const e of enemies) for (let j = 0; j < 2; j++) {
+          const s = u.allies[(j + Math.floor(Math.random() * 3)) % u.allies.length];
+          parts.push({ kind: 'streak', x0: s.x + rand(-20, 20), y0: s.y, x1: e.x + rand(-10, 10), y1: e.y, life: 0.3, max: 0.3, color: '200,160,255' });
+        }
+        later(0.15, () => { for (const e of enemies) pop(e.x + rand(-10, 10), e.y + rand(-10, 10), 0.7); });
+        flashColor = '200,170,255'; flashT = Math.max(flashT, 0.1);
+        boom(0.3, 0.12, 1500);
+      }
+    } else if (u.kind === 'front') {
+      // 먹구름: a storm front rolls in with rain and lightning columns
+      u.allies.forEach((a, i) => to(a, 80 + i * 160, 110 + Math.sin(t * 3 + i) * 20, 7));
+      for (let i = 0; i < 6; i++) parts.push({ kind: 'spark', x: rand(0, W), y: rand(-20, H * 0.4), vx: 120, vy: 900, life: 0.5, max: 0.5, size: 2.5, color: '180,210,255' });
+      if (tick) {
+        ultHit(12, 70);
+        for (let j = 0; j < 3; j++) { const x = rand(30, W - 30); vbeam(x, 30, 0.3, '170,210,255'); bolt(x + rand(-30, 30), -10, x, H, '200,230,255'); }
+        for (const e of enemies) spark(e.x, e.y, '200,230,255', 6, 200);
+        flashColor = '170,210,255'; flashT = Math.max(flashT, 0.15);
+        boom(0.3, 0.12, 3000);
+      }
+    } else if (u.kind === 'barrage') {
+      // 방패별: the fortress and its escort shell the whole screen
+      u.allies.forEach((a, i) => to(a, p.x + [-80, 80, 0][i % 3], p.y + [10, 10, 60][i % 3], 7));
+      if (tick) {
+        ultHit(12, 70);
+        const src = [p, ...u.allies];
+        for (let j = 0; j < 7; j++) {
+          const x = rand(30, W - 30), y = rand(60, H * 0.7), s = src[j % src.length];
+          parts.push({ kind: 'streak', x0: s.x, y0: s.y, x1: x, y1: y, life: 0.22, max: 0.22, color: '255,190,120' });
+          later(0.12, () => pop(x, y, 1.3));
+        }
+        boom(0.4, 0.16, 900); shake = Math.max(shake, 0.35);
+      }
+    } else if (u.kind === 'dawnrun') {
+      // 새벽별: wingmen streak up the screen again and again
+      if (tick) {
+        for (const a of u.allies) { a.x = rand(40, W - 40); a.y = H + 40; }
+        ultHit(12, 70);
+        flashColor = '255,230,170'; flashT = Math.max(flashT, 0.1);
+        boom(0.25, 0.1, 2600);
+      }
+      for (const a of u.allies) {
+        a.y -= 1400 * dt;
+        parts.push({ kind: 'spark', x: a.x + rand(-4, 4), y: a.y + 30, vx: 0, vy: 0, life: 0.35, max: 0.35, size: 7, color: '255,225,150' });
+      }
+    } else if (u.kind === 'fleet') {
+      // 폭풍눈: every retired craft returns and calls down lightning
+      const n = u.allies.length;
+      u.allies.forEach((a, i) => to(a, W * (i + 1) / (n + 1), 120 + Math.abs(i - (n - 1) / 2) * 26, 6));
+      if (tick) {
+        ultHit(12, 70);
+        for (const e of enemies) { const s = u.allies[Math.floor(Math.random() * n)]; bolt(s.x, s.y, e.x, e.y, '190,150,255'); }
+        for (let j = 0; j < 4; j++) { const x = rand(20, W - 20); bolt(x, -10, x, rand(H * 0.3, H * 0.9), '170,140,255'); }
+        flashColor = '180,140,255'; flashT = Math.max(flashT, 0.14);
+        boom(0.25, 0.12, 2600);
+      }
     } else {
       // wingmen take three points, light a moon between them, and it sweeps four beams around
       const cx = W / 2, cy = H * 0.36;
@@ -2081,6 +2557,19 @@ function makeShooter() {
         ctx.beginPath(); ctx.arc(cx, cy, 26 * o, 0, TAU); ctx.arc(cx + 11 * o, cy - 5 * o, 22 * o, 0, TAU, true); ctx.fill('evenodd');
         ctx.restore();
       }
+    }
+    if (u.kind === 'searchlight' && t >= ULT_T0 && t < ULT_T1 + 0.2) {
+      const o = u.orb;
+      ctx.save(); ctx.lineCap = 'round';
+      for (const [w, colr] of [[34, 'rgba(255,230,140,0.25)'], [14, 'rgba(255,240,180,0.7)'], [4, '#fff']]) {
+        ctx.strokeStyle = colr; ctx.lineWidth = w;
+        for (let i = 0; i < 4; i++) {
+          const an = u.ang + i * Math.PI / 2;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + Math.cos(an) * 900 * o, p.y + Math.sin(an) * 900 * o); ctx.stroke();
+        }
+      }
+      glowDot(p.x, p.y, 30 + 50 * o, '255,230,140', 0.8);
+      ctx.restore();
     }
     for (const q of [p, ...u.allies]) glowDot(q.x, q.y, 50 + 6 * Math.sin(time * 12), '255,217,102', 0.4);
     for (const a of u.allies) drawPlane(a.x, a.y, 0, 0, 1, p.prop, a.look);
@@ -2217,14 +2706,15 @@ function makeShooter() {
     }
   }
   function drawEnding() {
-    const t = ending.t, id = P.pilot.id, E = ENDINGS[id];
+    const t = ending.t, kind = ending.kind || 'pilot', id = ending.id || P.pilot.id, cr = kind === 'craft' ? craftById(id) : null;
+    const E = kind === 'pilot' ? ENDINGS[id] : cr ? cr.ending : FINAL_ENDING, lead = PLANES[camp.orig];
     const al = Math.min(1, t / 1.2);
     ctx.save();
     ctx.globalAlpha = al;
     const g = ctx.createLinearGradient(0, 0, 0, 460);
     g.addColorStop(0, E.sky[0]); g.addColorStop(0.6, E.sky[1]); g.addColorStop(1, E.sky[2]);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    endingScene(id, t, al);
+    if (kind === 'pilot') endingScene(id, t, al); else if (cr) craftEndingScene(cr, t, al); else finalEndingScene(t, al);
     ctx.globalAlpha = al;
     for (let row = 0; row < 2; row++) {
       ctx.fillStyle = row ? '#fff8ee' : 'rgba(255,240,228,0.75)';
@@ -2237,15 +2727,15 @@ function makeShooter() {
     pg.addColorStop(0, 'rgba(18,20,44,0)'); pg.addColorStop(1, 'rgba(18,20,44,0.96)');
     ctx.fillStyle = pg; ctx.fillRect(0, 430, W, 70);
     ctx.fillStyle = 'rgba(18,20,44,0.96)'; ctx.fillRect(0, 500, W, H - 500);
-    drawPilot(id, 62, 506, 42, P.look.accent);
+    if (cr) craftPortrait(cr, 62, 506, 42); else drawPilot(lead.pilot.id, 62, 506, 42, lead.look.accent);
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.font = '12px "Gowun Dodum", sans-serif'; ctx.fillStyle = '#ffb36b';
-    ctx.fillText('E N D I N G', 120, 474);
+    ctx.fillText(kind === 'final' ? 'F I N A L   E N D I N G' : cr ? 'E N D I N G · 회수 기체' : 'E N D I N G', 120, 474);
     ctx.font = '28px "Black Han Sans", sans-serif';
     ctx.fillStyle = '#e0662a'; ctx.fillText(E.title, 120, 493);
     ctx.fillStyle = '#f6ecd9'; ctx.fillText(E.title, 120, 490);
-    ctx.font = '13px "Gowun Dodum", sans-serif'; ctx.fillStyle = P.look.accent;
-    ctx.fillText(P.pilot.name + ' · ' + P.name, 120, 526);
+    ctx.font = '13px "Gowun Dodum", sans-serif'; ctx.fillStyle = cr ? cr.look.accent : lead.look.accent;
+    ctx.fillText(cr ? cr.title + ' ' + cr.name + ' · ' + lead.pilot.name : kind === 'final' ? lead.pilot.name + ' · 새벽 편대' : lead.pilot.name + ' · ' + lead.name, 120, 526);
     ctx.font = '15px "Gowun Dodum", sans-serif';
     let y = 566;
     E.text.forEach((line, i) => {
@@ -2260,7 +2750,8 @@ function makeShooter() {
     ctx.fillText('최종 점수 ' + fmt(score) + ' · 격추 ' + kills + ' · 이어하기 ' + continues + '번', W / 2, 670);
     if (t > 2.5 && Math.floor(t * 2) % 2) {
       ctx.font = '12px "Gowun Dodum", sans-serif'; ctx.fillStyle = 'rgba(246,236,217,0.75)';
-      ctx.fillText('Space · 화면 누르기 ▶ 더 강해진 2주차로', W / 2, 696);
+      const more = camp.pool.length - 1 + (camp.next < CRAFT_ORDER.length ? 1 : 0) > 0;
+      ctx.fillText('Space · 화면 누르기 ▶ ' + (kind === 'pilot' ? '2부 회수 작전으로' : cr ? (more ? '격납고로' : '마지막 출격으로') : '무한 모드로'), W / 2, 696);
     }
     ctx.restore();
   }
@@ -2279,7 +2770,8 @@ function makeShooter() {
     for (let x = -h + (t * 500) % 44; x < W + h; x += 44) { ctx.moveTo(x, cy + h / 2); ctx.lineTo(x + h * 0.6, cy - h / 2); }
     ctx.stroke();
     ctx.fillStyle = '#ffd966'; ctx.fillRect(0, cy - h / 2, W * a, 4); ctx.fillRect(W * (1 - a), cy + h / 2 - 4, W * a, 4);
-    const crew = [P, ...PLANES.filter(pl => pl !== P)];
+    const leadPl = PLANES[camp.orig];
+    const crew = [leadPl, ...PLANES.filter(pl => pl !== leadPl)];
     crew.forEach((pl, i) => {
       const slide = Math.max(0, 1 - Math.max(0, t - i * 0.08) * 6);
       const x = 66 + i * 116 + slide * W, r = i === 0 ? 38 : 31;
@@ -2291,6 +2783,244 @@ function makeShooter() {
     });
     ctx.restore();
   }
+  /* ---- part 2 bombs: one per recovered craft ---- */
+  function pop(x, y, s = 1) {
+    for (let i = 0; i < 8 * s; i++) {
+      const a = rand(0, TAU), v = rand(30, 160) * s;
+      parts.push({ kind: 'fire', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.3, 0.6), max: 0.6, size: rand(5, 10) * s });
+    }
+    parts.push({ kind: 'ring', x, y, life: 0.3, max: 0.3, size: 40 * s, color: '255,220,160' });
+  }
+  const vbeam = (x, w, life, color, vx = 0) => parts.push({ kind: 'vbeam', x, y: 0, vx, vy: 0, w, life, max: life, color });
+  function eclipseBomb() {
+    flashColor = '255,170,210'; flashT = 0.4;
+    bombTitle('일식', '255,190,220');
+    boom(0.9, 0.22, 2200);
+    vbeam(0, 70, 0.9, '255,90,160', W / 1.8);
+    vbeam(W, 70, 0.9, '90,200,255', -W / 1.8);
+    for (const e of enemies.slice()) {
+      const d = Math.min(Math.abs(e.x), Math.abs(W - e.x)) / (W / 2) * 0.9;
+      later(d, () => { if (!e.dead) { hitEnemy(e, e.isBoss ? 45 : 70); spark(e.x, e.y, '255,220,240', 10, 220); } });
+    }
+    later(0.9, () => { flashColor = '255,255,255'; flashT = 0.3; parts.push({ kind: 'wave', x: W / 2, y: H / 2, life: 0.6, max: 0.6, size: 600, color: '255,200,230' }); });
+  }
+  function flashBomb() {
+    flashColor = '255,250,220'; flashT = 0.8;
+    bombTitle('등대 섬광', '255,240,170');
+    boom(0.6, 0.2, 3000); tone(1600, 0.6, 'sine', 0.05, 800);
+    freezeT = 2.2;
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * TAU;
+      parts.push({ kind: 'streak', x0: player.x, y0: player.y, x1: player.x + Math.cos(a) * 700, y1: player.y + Math.sin(a) * 700, life: 0.4, max: 0.4, color: '255,240,170' });
+    }
+    parts.push({ kind: 'wave', x: player.x, y: player.y, life: 0.8, max: 0.8, size: 900, color: '255,240,180' });
+    for (const e of enemies.slice()) later(0.1, () => { if (!e.dead) hitEnemy(e, e.isBoss ? 40 : 70); });
+  }
+  function dronesBomb() {
+    flashColor = '200,170,255'; flashT = 0.3;
+    bombTitle('무인기 출격', '215,190,255');
+    tone(300, 0.4, 'square', 0.04, 900);
+    const send = (e, dmg, delay) => later(delay, () => {
+      if (e.dead) return;
+      parts.push({ kind: 'streak', x0: player.x + rand(-40, 40), y0: player.y, x1: e.x, y1: e.y, life: 0.3, max: 0.3, color: '200,160,255' });
+      later(0.15, () => { if (!e.dead) { hitEnemy(e, dmg); pop(e.x + rand(-10, 10), e.y + rand(-10, 10), 1); } });
+    });
+    enemies.slice().forEach((e, i) => {
+      if (e.isBoss) for (let k = 0; k < 3; k++) send(e, 15, 0.1 + k * 0.1 + i * 0.02);
+      else send(e, 70, 0.1 + i * 0.03);
+    });
+    for (let k = 0; k < 6; k++) later(k * 0.06, () => {
+      const x = rand(30, W - 30), y = rand(80, H * 0.6);
+      parts.push({ kind: 'streak', x0: player.x, y0: player.y, x1: x, y1: y, life: 0.3, max: 0.3, color: '200,160,255' });
+      later(0.15, () => pop(x, y, 0.8));
+    });
+    later(0.3, () => boom(0.5, 0.18, 1500));
+  }
+  function thunderBomb() {
+    flashColor = '170,210,255'; flashT = 0.5;
+    bombTitle('벼락 기둥', '190,220,255');
+    boom(0.9, 0.24, 3200);
+    const xs = enemies.map(e => e.x).concat([rand(30, W - 30), rand(30, W - 30), rand(30, W - 30)]);
+    xs.forEach((x, i) => later(i * 0.05, () => { vbeam(x, 34, 0.35, '160,200,255'); bolt(x + rand(-30, 30), -10, x, H, '200,230,255'); }));
+    for (const e of enemies.slice()) {
+      const n = e.isBoss ? 3 : 1;
+      for (let k = 0; k < n; k++) later(0.1 + k * 0.15, () => { if (!e.dead) { hitEnemy(e, e.isBoss ? 15 : 70); spark(e.x, e.y, '200,230,255', 8, 200); } });
+    }
+  }
+  function shieldBomb() {
+    flashColor = '255,200,150'; flashT = 0.3;
+    bombTitle('반사 방패', '255,210,170');
+    tone(440, 0.6, 'triangle', 0.06, 880);
+    shieldT = 5;
+    parts.push({ kind: 'wave', x: player.x, y: player.y, life: 0.6, max: 0.6, size: 300, color: '255,200,150' });
+    for (const e of enemies.slice()) later(0.1, () => { if (!e.dead) hitEnemy(e, e.isBoss ? 20 : 70); });
+  }
+  function dashBomb() {
+    flashColor = '255,235,180'; flashT = 0.35;
+    bombTitle('새벽 돌진', '255,230,170');
+    boom(0.5, 0.2, 3000);
+    const x = player.x;
+    for (const dx of [-30, 0, 30]) parts.push({ kind: 'streak', x0: x + dx, y0: player.y, x1: x + dx * 0.3, y1: -40, life: 0.35, max: 0.35, color: '255,230,160' });
+    vbeam(x, 150, 0.5, '255,220,150');
+    for (const e of enemies.slice()) {
+      const near = Math.abs(e.x - x) < (e.hw || e.r || 20) + 80;
+      later(0.05 + Math.max(0, player.y - e.y) / 3000, () => { if (!e.dead) { hitEnemy(e, e.isBoss ? (near ? 45 : 20) : 70); spark(e.x, e.y, '255,230,170', 8, 220); } });
+    }
+  }
+  function tempestBomb() {
+    flashColor = '160,120,255'; flashT = 0.6; shake = Math.max(shake, 0.8);
+    bombTitle('대폭풍', '200,170,255');
+    boom(1.4, 0.3, 1800); tone(80, 1, 'sawtooth', 0.08, 40);
+    parts.push({ kind: 'wave', x: player.x, y: player.y, life: 1, max: 1, size: 900, color: '170,130,255' });
+    for (let k = 0; k < 10; k++) later(k * 0.06, () => { const x = rand(20, W - 20); bolt(x + rand(-40, 40), -10, x, rand(H * 0.3, H), '190,150,255'); });
+    for (const e of enemies.slice()) {
+      const n = e.isBoss ? 3 : 1;
+      for (let k = 0; k < n; k++) later(0.1 + k * 0.14, () => { if (!e.dead) { bolt(e.x + rand(-40, 40), -10, e.x, e.y, '210,180,255'); hitEnemy(e, e.isBoss ? 17 : 70); spark(e.x, e.y, '220,200,255', 8, 220); } });
+    }
+  }
+  const dronePos = (i, n) => ({ x: player.x + Math.cos(time * 2.5 + i * TAU / n) * 36, y: player.y + 6 + Math.sin(time * 2.5 + i * TAU / n) * 20 });
+
+  /* ---- campaign: part 1 (1-8), recovery chapters of 4 stages, final chapter, endless ---- */
+  function stageBoss() {
+    if (camp.act === 1 || camp.act === 4) return { kind: BOSS_ORDER[(stageNo - 1) % BOSS_ORDER.length], shadow: false };
+    if (camp.act === 3) return camp.chStage >= 3 ? { kind: 'factory', shadow: false } : { kind: ['nest', 'ace', 'dread'][camp.chStage], shadow: true };
+    const own = craftById(camp.craft).type;
+    if (camp.chStage >= 3) return { kind: own, shadow: true };
+    const others = BOSS_ORDER.filter(t => t !== own);
+    return { kind: others[(camp.chapter * 3 + camp.chStage) % others.length], shadow: true };
+  }
+  function saveRun() {
+    Save.setRun({ plane: camp.orig, diff: DIFFS.indexOf(D), stage: stageNo, score, kills, continues,
+      hp: player.hp, maxHp: player.maxHp, power: player.power, bombs: player.bombs, camp: JSON.parse(JSON.stringify(camp)) });
+  }
+  function nextStage() {
+    stageNo++;
+    if (camp.act === 2 || camp.act === 3) camp.chStage++;
+    startStage();
+    saveRun();
+  }
+  function setPlane(def) {
+    P = PLANES.includes(def) ? def : Object.assign({}, def, { pilot: PLANES[camp.orig].pilot });
+    const hp = Math.max(2, P.hp + D.hpBonus);
+    player.maxHp = hp; player.hp = hp; player.inv = Math.max(player.inv, 2); player.sub = null; player.burstN = 0;
+  }
+  function startPart2() {
+    camp.act = 2; camp.chapter = 0; camp.chStage = -1;
+    showBanner('PART 2', '회수 작전', 2.4);
+    startScene(PART2.intro.map(([n, t]) => radioLine(t, n)).concat([pilotLine(PART2.pilot[P.pilot.id])]), openHangar);
+  }
+  function openHangar() {
+    App.openHangar(camp.pool.map(craftById), camp.chapter + 1, CRAFTS.length, pickCraft);
+  }
+  function pickCraft(id) {
+    camp.craft = id; camp.chapter++; camp.chStage = -1;
+    setPlane(craftById(id));
+    player.power = Math.max(player.power, 3); player.bombs = Math.max(player.bombs, D.bombs);
+    later(2.6, () => floatText(player.x, player.y - 50, craftById(id).name + ' 출격 · 무기 ' + P.weaponName, '220,235,255'));
+    nextStage();
+  }
+  function retireCraft() {
+    camp.done.push(camp.craft);
+    camp.pool = camp.pool.filter(x => x !== camp.craft);
+    if (camp.next < CRAFT_ORDER.length) camp.pool.push(CRAFT_ORDER[camp.next++]);
+    camp.craft = null;
+    if (camp.pool.length) { openHangar(); return; }
+    camp.act = 3; camp.chStage = -1;
+    setPlane(PLANES[camp.orig]);
+    showBanner('FINAL', '마지막 출격', 2.4);
+    startScene(PART2.final.map(([n, t]) => radioLine(t, n)).concat([pilotLine(PART2.finalPilot[P.pilot.id])]), nextStage);
+  }
+
+  /* ---- final boss: the bombing run over the factory ---- */
+  function startFinale(e) {
+    explode(e.x, e.y, 2.6);
+    for (const b of eb) spark(b.x, b.y, '255,210,150', 2);
+    eb = []; beams = [];
+    for (const o of enemies) if (!o.dead) { o.dead = true; explode(o.x, o.y, 0.7); }
+    const lead = PLANES[camp.orig];
+    const looks = [lead.look, ...PLANES.filter(p => p !== lead).map(p => p.look), ...CRAFTS.map(c => c.look)];
+    finale = { t: 0, wait: true, gone: false,
+      e: Object.assign({}, e, { dead: false, flash: 0, hp: 1, maxHp: 100 }),
+      flights: looks.map((look, i) => ({ look, x: 50 + (i % 6) * 76 + (Math.floor(i / 6) % 2) * 38, y: H + 60 + Math.floor(i / 6) * 110 + rand(0, 24), drop: false })) };
+    player.inv = 99;
+    startScene([radioLine(PART2.wallDown), bossLine(BOSS_INFO.factory.last, '무한 복제 공장')], () => {
+      finale.wait = false;
+      showBanner('총공격', '새벽 편대 전 기체, 복제 공장 폭격', 2.4, true);
+      fanfare();
+    });
+  }
+  function updateFinale(dt) {
+    const f = finale;
+    if (f.wait) return;
+    f.t += dt;
+    if (!f.gone) shake = Math.max(shake, 0.15);
+    for (const c of f.flights) {
+      c.y -= 240 * dt;
+      if (Math.random() < 0.5) parts.push({ kind: 'spark', x: c.x + rand(-6, 6), y: c.y + 28, vx: 0, vy: 60, life: 0.4, max: 0.4, size: 4, color: '255,225,140' });
+      if (!c.drop && !f.gone && c.y < f.e.y + 230) {
+        c.drop = true;
+        for (let k = 0; k < 3; k++) later(k * 0.12, () => {
+          const tx = f.e.x + rand(-160, 160), ty = f.e.y + rand(-40, 50);
+          parts.push({ kind: 'streak', x0: c.x, y0: c.y, x1: tx, y1: ty, life: 0.28, max: 0.28, color: '255,220,150' });
+          later(0.14, () => { pop(tx, ty, 1.6); if (Math.random() < 0.35) boom(0.3, 0.12, 900); });
+        });
+      }
+    }
+    if (!f.gone && f.t > 3.6) {
+      f.gone = true;
+      explode(f.e.x, f.e.y, 4.5);
+      for (let i = 0; i < 4; i++) later(i * 0.12, () => parts.push({ kind: 'wave', x: f.e.x, y: f.e.y, life: 1.1, max: 1.1, size: 1000, color: i % 2 ? '255,140,90' : '255,230,170' }));
+      later(0.3, () => { for (let i = 0; i < 10; i++) pop(f.e.x + rand(-170, 170), f.e.y + rand(-50, 60), 2); });
+      flashColor = '255,255,255'; flashT = 0.9; shake = 1;
+      boom(2, 0.36, 300); tone(50, 1.5, 'sine', 0.15, 25);
+    }
+    if (f.t > 6) { finale = null; afterFinale(); }
+  }
+  function afterFinale() {
+    player.inv = 2;
+    startScene([radioLine(PART2.factoryGone), pilotLine(PART2.lastWord[P.pilot.id])], () => {
+      Save.markEnding('final');
+      Save.markClear(camp.orig, DIFFS.indexOf(D), continues === 0);
+      ending = { t: 0, kind: 'final', id: 'final', finish: startEndless };
+      fanfare();
+    });
+  }
+  function startEndless() {
+    camp.act = 4; camp.chStage = -1;
+    clearT = 2.8; player.inv = 2;
+    showBanner('무한 모드', '끝없이 몰려오는 적과 싸워요', 2.8);
+    fanfare();
+  }
+  function drawFinale() {
+    const f = finale;
+    if (!f.gone) { f.e.flash = Math.random() < 0.1 ? 0.05 : 0; f.e.hp = 1; drawEnemy(f.e); }
+    for (const c of f.flights) drawPlane(c.x, c.y, 0, 0, 1, player.prop, c.look);
+  }
+
+  /* ---- ending scenes for part 2 ---- */
+  function craftEndingScene(c, t, al) {
+    glowDot(352, 140, 120, '255,232,170', 0.6);
+    ctx.fillStyle = '#fff6da'; ctx.beginPath(); ctx.arc(352, 140, 40, 0, TAU); ctx.fill();
+    const y = 300 - Math.min(t, 8) * 10, bob = Math.sin(t * 1.3) * 6;
+    for (let i = 1; i <= 10; i++) {
+      ctx.fillStyle = `rgba(255,235,190,${al * (1 - i / 11) * 0.8})`;
+      ctx.beginPath(); ctx.arc(190 + Math.sin(i + t * 2) * 6, y + 50 + i * 14 + bob, Math.max(1, 4 - i * 0.25), 0, TAU); ctx.fill();
+    }
+    drawPlane(190, y + bob, 0, 0, al, t * 40, Object.assign({}, c.look, { noShadow: true, scale: 2.2 }));
+  }
+  function finalEndingScene(t, al) {
+    const sy = 430 - Math.min(t, 6) * 18;
+    glowDot(W / 2, sy, 300, '255,200,150', 0.7);
+    ctx.fillStyle = '#fff2d0'; ctx.beginPath(); ctx.arc(W / 2, sy, 60, 0, TAU); ctx.fill();
+    const lead = PLANES[camp.orig];
+    const looks = [lead.look, ...PLANES.filter(p => p !== lead).map(p => p.look), ...CRAFTS.map(c => c.look)];
+    looks.forEach((lk, i) => {
+      const side = i === 0 ? 0 : (i % 2 ? -1 : 1), row = Math.ceil(i / 2);
+      const x = W / 2 + side * row * 38, y = 110 + row * 32 + Math.sin(t * 1.3 + i) * 4;
+      drawPlane(x, y, 0, 0, al, t * 40, Object.assign({}, lk, { noShadow: true, scale: (lk.scale || 1) * 0.7 }));
+    });
+  }
+
   function hitEnemy(e, dmg) {
     if (e.dead) return;
     if (e.armored && turretsLeft()) { e.flash = 0.03; return; }
@@ -2330,6 +3060,7 @@ function makeShooter() {
     }
   }
   function stageClear(e) {
+    if (e.type === 'factory') { startFinale(e); return; }
     for (let i = 0; i < 12; i++) later(i * 0.12, () => explode(e.x + rand(-80, 80), e.y + rand(-40, 40), 1.7));
     later(1.2, () => { explode(e.x, e.y, 3.4); flashColor = '255,255,255'; flashT = 0.5; parts.push({ kind: 'wave', x: e.x, y: e.y, life: 1, max: 1, size: 900, color: '255,230,200' }); });
     explode(e.x, e.y, 3);
@@ -2346,22 +3077,35 @@ function makeShooter() {
   function afterBoss() {
     if (player.dead) { pendingAfter = true; return; }
     pendingAfter = false;
-    const last = stageNo === BOSS_ORDER.length;
-    const finish = () => {
+    const normalFinish = () => {
       clearT = 2.8;
-      if (last) showBanner('MISSION COMPLETE', '2주차: 더 강한 함대가 깨어나요', 2.8);
-      else showBanner('STAGE CLEAR', bossLabel() + ' 격파 · 보너스 +' + fmt(2000 * stageNo * D.score), 2.8);
+      showBanner('STAGE CLEAR', bossLabel() + ' 격파 · 보너스 +' + fmt(2000 * stageNo * D.score), 2.8);
       fanfare();
     };
-    if (!storyOn()) { finish(); return; }
-    const info = BOSS_INFO[bossKind], L = PILOT_LINES[P.pilot.id];
-    const lines = [bossLine(info.last, info.lastName), pilotLine(L[bossKind][1])];
-    if (last) { lines.push(radioLine('통제 신호 소멸 확인. 무인 함대가 멈췄다. 새벽 편대, 귀환을 환영한다.')); for (const t of L.end) lines.push(pilotLine(t)); }
-    startScene(lines, last ? () => { ending = { t: 0, finish }; fanfare(); } : finish);
+    if (camp.act === 1) {
+      const last = stageNo === BOSS_ORDER.length;
+      const info = BOSS_INFO[bossKind], L = PILOT_LINES[P.pilot.id];
+      const lines = [bossLine(info.last, info.lastName), pilotLine(L[bossKind][1])];
+      if (last) { lines.push(radioLine('통제 신호 소멸 확인. 무인 함대가 멈췄다. 새벽 편대, 귀환을 환영한다.')); for (const t of L.end) lines.push(pilotLine(t)); }
+      startScene(lines, last ? () => {
+        Save.markEnding(P.pilot.id);
+        ending = { t: 0, kind: 'pilot', id: P.pilot.id, finish: startPart2 }; fanfare();
+      } : normalFinish);
+      return;
+    }
+    if (camp.act === 2 && camp.chStage >= 3) {
+      const c = craftById(camp.craft);
+      startScene([radioLine(PART2.shadowDown(c)), pilotLine(PART2.thanks(c))], () => {
+        Save.markEnding(c.id);
+        ending = { t: 0, kind: 'craft', id: c.id, finish: retireCraft }; fanfare();
+      });
+      return;
+    }
+    normalFinish();
   }
   function dropItem(x, y, kind) { items.push({ x, y, kind, t: 0, vy: 70 }); }
   function hurtPlayer() {
-    if (player.inv > 0 || player.dead || scene) return;
+    if (player.inv > 0 || player.dead || scene || shieldT > 0 || finale) return;
     player.hp--;
     player.inv = 2;
     player.power = Math.max(1, player.power - 1);
@@ -2475,6 +3219,29 @@ function makeShooter() {
           e.ltT = 3.6; tone(1200, 0.85, 'sine', 0.03, 300);
         }
       }
+    } else if (e.type === 'factory') {
+      e.x = W / 2 + Math.sin(mt * 0.25) * 30; e.y = 150 + Math.sin(mt * 0.6) * 6;
+      if (Math.random() < dt * 8) parts.push({ kind: 'smoke', x: e.x + [-130, -70, 70, 130][Math.floor(Math.random() * 4)], y: e.y - 100, vx: rand(-8, 8), vy: rand(-50, -20), life: 1.2, max: 1.2, size: rand(8, 14) });
+      e.launchFx = Math.max(0, e.launchFx - dt);
+      e.launchT -= fr;
+      if (e.launchT <= 0) {
+        if (enemies.filter(o => o.minion && !o.dead).length < 8) {
+          for (const sx of [-112, 0, 112]) addEnemy(Math.random() < 0.3 ? 'diver' : 'scout', { x: e.x + sx, y: e.y + 40, x0: e.x + sx, amp: 40, freq: rand(1.8, 2.6), vy: 150, phase: rand(0, 3), ty: rand(250, 360), minion: true, drop: 0.06, score: 30 });
+          e.launchFx = 0.5; tone(300, 0.12, 'square', 0.03, 600);
+        }
+        e.launchT = e.phase2 ? 2.2 : 3;
+      }
+      e.fireT -= fr;
+      if (e.fireT <= 0) { shootAt(e.x, e.y + 50, 210, e.phase2 ? 7 : 5, 0.16, 5, 0); e.fireT = 1.7; tone(200, 0.08, 'square', 0.02, 120); }
+      e.fire2 -= fr;
+      if (e.fire2 <= 0) { ring(e.x, e.y, e.phase2 ? 20 : 14, 130, mt, 5, 1); e.fire2 = 2.6; }
+      if (e.phase2) {
+        e.beamT -= fr;
+        if (e.beamT <= 0) {
+          for (const x of [player.x, rand(40, W - 40)]) beams.push({ x, y0: e.y + 50, w: 40, warn: 0.9, live: 0.4, rgb: '255,90,60' });
+          e.beamT = 4; tone(90, 0.85, 'sawtooth', 0.05, 700);
+        }
+      }
     } else if (e.type === 'boss') {
       e.x = W / 2 + Math.sin(mt * 0.5) * 130;
       e.y = 140 + Math.sin(mt * 0.9) * 14;
@@ -2554,11 +3321,13 @@ function makeShooter() {
       }
       if (b.life !== undefined) b.life -= dt;
       b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.wob) { b.age += dt; b.x = b.x0 + Math.sin(b.age * 10 + b.ph) * b.wob; }
     }
     pb = pb.filter(b => b.y > -20 && b.y < H + 20 && b.x > -20 && b.x < W + 20 && !b.hit && (b.life === undefined || b.life > 0));
 
     for (const e of enemies) {
       e.t += dt; e.flash = Math.max(0, e.flash - dt);
+      if (freezeT > 0) continue;
       const fr = dt * D.fire;
       if (e.type === 'scout') {
         e.y += e.vy * dt;
@@ -2635,11 +3404,17 @@ function makeShooter() {
     enemies = enemies.filter(e => !e.dead && !e.gone);
 
     for (const b of eb) {
+      if (freezeT > 0) continue;
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.fuse !== undefined) {
         b.fuse -= dt;
         if (b.fuse <= 0) { b.hit = true; ring(b.x, b.y, 8, 150, rand(0, 1), 5, 1); spark(b.x, b.y, '255,190,120', 8, 160); boom(0.2, 0.08, 900); }
       }
+    }
+    if (shieldT > 0 && !p.dead) for (const b of eb) if (!b.hit && Math.hypot(b.x - p.x, b.y - p.y) < 64) {
+      b.hit = true;
+      const a = Math.atan2(b.y - p.y, b.x - p.x);
+      pb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 600, vy: Math.min(-200, Math.sin(a) * 600), dmg: 2 * P.dmg, ang: 0, style: 'orb' });
     }
     if (!p.dead) {
       for (const b of eb) if (!b.hit && Math.hypot(b.x - p.x, b.y - p.y) < b.r + P.hit) { b.hit = true; hurtPlayer(); break; }
@@ -2694,17 +3469,28 @@ function makeShooter() {
 
   const api = {
     id: 'shooter', name: '구름바다 요격전', hasBomb: true, canContinue: true,
-    init() {
+    init(run) {
       flow = { x: 0, y: 1 }; streakAlpha = 0.12;
-      P = PLANES[App.setup.plane] || PLANES[1];
-      D = DIFFS[App.setup.diff] || DIFFS[1];
+      P = PLANES[run ? run.plane : App.setup.plane] || PLANES[1];
+      D = DIFFS[run ? run.diff : App.setup.diff] || DIFFS[1];
       const hp = Math.max(2, P.hp + D.hpBonus);
       player = { x: W / 2, y: H - 120, hp, maxHp: hp, power: 1, bombs: D.bombs, inv: 2, cd: 0, prop: 0, tilt: 0, dead: false, shot: 0, sub: null, subT: 0 };
       pb = []; eb = []; enemies = []; items = []; beams = []; anchor = null; timers = []; scene = null;
       score = 0; kills = 0; stageNo = 1; continues = 0; missileT = 0; owlT = 0.5; laserSfx = 0; slowT = 0; pendingAfter = false;
       bossKind = BOSS_ORDER[0]; ult = null; ultReady = true; ending = null;
+      camp = { act: 1, orig: PLANES.indexOf(P), pool: CRAFT_ORDER.slice(0, 3), next: 3, done: [], craft: null, chStage: -1, chapter: 0 };
+      finale = null; freezeT = 0; shieldT = 0; droneT = 0; boltT = 0; bossShadow = false;
       stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false;
       setSky(0);
+      if (run) {
+        score = run.score; kills = run.kills; continues = run.continues; stageNo = run.stage;
+        if (run.camp) camp = JSON.parse(JSON.stringify(run.camp)); else if (run.stage > BOSS_ORDER.length) camp.act = 4;
+        if (camp.craft) setPlane(craftById(camp.craft));
+        Object.assign(player, { hp: run.hp, maxHp: run.maxHp, power: run.power, bombs: run.bombs, inv: 3 });
+        startStage();
+        later(2.6, () => floatText(player.x, player.y - 50, '이어서 출격 · ' + P.pilot.name, '220,235,255'));
+        return;
+      }
       startScene([radioLine(OPENING[0]), radioLine(OPENING[1]), pilotLine(PILOT_LINES[P.pilot.id].open)], () => {
         startStage();
         later(2.6, () => floatText(player.x, player.y - 50, '무기: ' + P.weaponName, '220,235,255'));
@@ -2746,6 +3532,7 @@ function makeShooter() {
       timers = timers.filter(tm => !tm.done);
       if (scene) return;
       if (ult) updateUlt(dt);
+      if (finale) { updateFinale(dt); return; }
       const p = player;
       if (p.dead) {
         deathT -= dt; updateWorld(dt);
@@ -2776,10 +3563,28 @@ function makeShooter() {
         owlT -= dt;
         if (owlT <= 0) { launchMissiles(p.power >= 4 ? 2 : 1); owlT = [0.5, 0.42, 0.36, 0.42, 0.36][p.power - 1]; }
       }
+      if (P.weapon === 'drone') {
+        droneT -= dt;
+        if (droneT <= 0) {
+          droneT = 0.14;
+          const n = [2, 2, 3, 3, 4][p.power - 1];
+          for (let i = 0; i < n; i++) { const d = dronePos(i, n); pb.push({ x: d.x, y: d.y, h: -Math.PI / 2, vx: 0, vy: 0, ang: 0, dmg: 2.2 * P.dmg, homing: true, life: 1.8 }); }
+        }
+      }
+      if (P.weapon === 'storm') {
+        boltT -= dt;
+        if (boltT <= 0) {
+          boltT = Math.max(0.3, 0.55 - 0.05 * p.power);
+          const tg = nearestEnemy(p.x, p.y);
+          if (tg) { bolt(p.x, p.y - 20, tg.x, tg.y, '190,150,255'); hitEnemy(tg, (6 + p.power) * P.dmg); spark(tg.x, tg.y, '210,190,255', 6, 180); }
+        }
+      }
+      if (freezeT > 0) freezeT -= dt;
+      if (shieldT > 0) shieldT -= dt;
 
       if (clearT > 0) {
         clearT -= dt;
-        if (clearT <= 0) { stageNo++; startStage(); }
+        if (clearT <= 0) nextStage();
       } else if (!bossSpawned) {
         if (stageTime >= STAGE_LEN) { if (enemies.length === 0 || stageTime >= STAGE_LEN + 4) spawnBoss(); }
         else {
@@ -2795,7 +3600,7 @@ function makeShooter() {
           // escort squad: a few scouts fly in beside the boss (fewer for the carrier, which launches its own)
           escortT -= dt;
           if (escortT <= 0) {
-            const nest = b.type === 'nest';
+            const nest = b.type === 'nest' || b.type === 'factory';
             escortT = (nest ? 5 : 3.5) - Math.min(1, 0.1 * grow());
             if (enemies.filter(e => e.escort && !e.dead).length < 11) {
               const n = nest ? 4 : grow() >= 4 ? 6 : 5, side = Math.random() < 0.5 ? -1 : 1;
@@ -2850,6 +3655,7 @@ function makeShooter() {
       for (const it of items) drawItem(it);
       for (const e of enemies) if (e.type !== 'turret') drawEnemy(e);
       for (const e of enemies) if (e.type === 'turret') drawEnemy(e);
+      if (finale) drawFinale();
       drawBeams();
       if (windNow) {
         const dir = Math.sign(windNow), a = Math.min(1, Math.abs(windNow) / 50);
@@ -2870,6 +3676,15 @@ function makeShooter() {
       if (!player.dead) {
         const blink = player.inv > 0 && !scene && !ult && Math.floor(player.inv * 14) % 2 === 0;
         drawPlane(player.x, player.y, 0, player.tilt, blink ? 0.35 : 1, player.prop, P.look);
+        if (P.weapon === 'drone') {
+          const n = [2, 2, 3, 3, 4][player.power - 1];
+          for (let i = 0; i < n; i++) { const d = dronePos(i, n); ctx.save(); ctx.translate(d.x, d.y); ctx.scale(0.6, 0.6); drawEnemy({ type: 'scout', x: 0, y: 0, rot: Math.PI, flash: 0 }); ctx.restore(); }
+        }
+        if (shieldT > 0) {
+          glowDot(player.x, player.y, 66, '255,200,150', 0.22);
+          ctx.strokeStyle = `rgba(255,200,150,${0.5 + 0.3 * Math.sin(time * 10)})`; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.arc(player.x, player.y, 60, 0, TAU); ctx.stroke();
+        }
         if (keys.slow) {
           ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 2;
           ctx.beginPath(); ctx.arc(player.x, player.y, P.hit, 0, TAU); ctx.fill(); ctx.stroke();
@@ -2938,10 +3753,11 @@ function makeShooter() {
       if (ending) drawEnding();
     },
     score: () => score,
-    music: () => (ending ? 'menu' : bossSpawned && clearT <= 0 && bossParts().length ? 'boss' : 'stage'),
-    cinematic: () => !!ending,
+    music: () => (ending ? 'menu' : finale ? 'boss' : bossSpawned && clearT <= 0 && bossParts().length ? 'boss' : 'stage'),
+    cinematic: () => !!ending || !!finale,
     reason: () => '임무 종료',
     continueInfo: () => ({ score, stage: stageNo, used: continues }),
+    recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0 }),
     stats: () => [['점수', fmt(score)], ['조종사', P.pilot.name + ' · ' + P.name], ['난이도', D.name], ['도달 스테이지', stageNo], ['격추 수', kills], ['이어하기', continues + '번']],
   };
   return api;
@@ -2950,23 +3766,35 @@ function makeShooter() {
 /* ================= app shell ================= */
 const GAMES = { shooter: makeShooter() };
 const ORDER = ['shooter'];
-const STORE = { shooter: 'cloudsea-best' };
-const bests = {};
-for (const id of ORDER) { try { bests[id] = +localStorage.getItem(STORE[id]) || 0; } catch (e) { bests[id] = 0; } }
 
 const App = {
   mode: 'menu', game: null, offers: null,
-  setup: (() => {
-    try {
-      const s = JSON.parse(localStorage.getItem('cloudsea-setup') || '{}');
-      return { plane: clamp(s.plane | 0, 0, 3), diff: s.diff === undefined ? 1 : clamp(s.diff | 0, 0, 2) };
-    } catch (e) { return { plane: 1, diff: 1 }; }
-  })(),
+  setup: { plane: Save.settings.plane, diff: Save.settings.diff },
   openSetup() { initAudio(); App.mode = 'setup'; App.game = null; renderSetup(); syncUI(); },
   setSetup(key, v) {
     App.setup[key] = v;
-    try { localStorage.setItem('cloudsea-setup', JSON.stringify(App.setup)); } catch (e) {}
+    Save.set(key, v);
     renderSetup();
+  },
+  hangar: null,
+  openHangar(choices, chapter, total, cb) {
+    App.hangar = { choices, chapter, total, cb, sel: 0 };
+    App.mode = 'hangar';
+    renderHangar();
+    syncUI();
+  },
+  selHangar(i) {
+    if (!App.hangar || !App.hangar.choices[i]) return;
+    App.hangar.sel = i;
+    renderHangar();
+  },
+  pickHangar() {
+    const h = App.hangar;
+    if (App.mode !== 'hangar' || !h) return;
+    App.hangar = null;
+    App.mode = 'play';
+    syncUI();
+    h.cb(h.choices[h.sel].id);
   },
   askContinue() {
     const info = App.game.continueInfo();
@@ -2980,17 +3808,25 @@ const App = {
     App.mode = 'play';
     syncUI();
   },
-  start(id) {
+  start(id, run) {
     initAudio();
+    App.hangar = null;
+    if (!run) Save.clearRun();
     const g = GAMES[id];
     App.game = g;
     parts = []; shake = 0; flashT = 0; banner.t = 0; drag = null;
     for (const k in keys) keys[k] = false;
-    g.init();
+    g.init(run);
     App.mode = 'play';
     syncUI();
   },
   retry() { if (App.game) App.start(App.game.id); },
+  resume() {
+    const r = Save.run;
+    if (!r) return;
+    App.setup.plane = r.plane; App.setup.diff = r.diff;
+    App.start('shooter', r);
+  },
   menu() {
     App.mode = 'menu'; App.game = null;
     flow = { x: 0, y: 1 }; streakAlpha = 0.12; setSky(0);
@@ -3005,11 +3841,16 @@ const App = {
   end() {
     const g = App.game, s = g.score();
     App.mode = 'over';
-    const isBest = s > bests[g.id];
-    if (isBest) { bests[g.id] = s; try { localStorage.setItem(STORE[g.id], String(s)); } catch (e) {} }
-    $('overEyebrow').textContent = isBest ? '새 최고 기록' : g.reason();
+    const ri = g.recordInfo(), nb = Save.record(ri.plane, ri.diff, s, ri.nc), b = Save.best(ri.plane, ri.diff);
+    Save.clearRun();
+    $('overEyebrow').textContent = nb.nc ? '노컨티뉴 신기록' : nb.all ? '새 최고 기록' : g.reason();
     $('overTitle').textContent = '임무 종료';
-    const rows = g.stats().concat([['최고 기록', fmt(bests[g.id])]]);
+    const rows = g.stats().concat([
+      ['최고 기록 (일반)', fmt(b.all)],
+      ['최고 기록 (노컨티뉴)', b.nc ? fmt(b.nc) : '없음'],
+      ['엔딩 수집', Save.endingCount() + ' / 12'],
+    ]);
+    if (!ri.nc) rows.push(['노컨티뉴 기록', '이어하기를 해서 제외']);
     const box = $('overStats');
     box.textContent = '';
     for (const [k, v] of rows) {
@@ -3026,6 +3867,7 @@ function syncUI() {
   $('menuScr').hidden = m !== 'menu';
   $('pauseScr').hidden = m !== 'paused';
   $('overScr').hidden = m !== 'over';
+  $('hangarScr').hidden = m !== 'hangar';
   $('setupScr').hidden = m !== 'setup';
   $('contScr').hidden = m !== 'continue';
   $('bombBtn').hidden = !(m === 'play' && App.game && App.game.hasBomb);
@@ -3033,7 +3875,12 @@ function syncUI() {
   $('soundBtn').textContent = muted ? '효과음 끔' : '효과음 켬';
   $('musicBtn').textContent = musicOn ? '음악 켬' : '음악 끔';
   Music.refresh();
-  for (const id of ORDER) $('best-' + id).textContent = fmt(bests[id]);
+  $('best-shooter').textContent = fmt(Save.topAll());
+  $('endCount').textContent = Save.endingCount();
+  const run = Save.run;
+  $('resumeRunBtn').hidden = !run;
+  $('runInfo').hidden = !run;
+  if (run) $('runInfo').textContent = `저장된 진행: ${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
 }
 
 /* input wiring */
@@ -3048,6 +3895,10 @@ window.addEventListener('keydown', e => {
     if (i >= 0 || j === 3) App.setSetup('plane', j);
     if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.start('shooter'); }
     if (e.code === 'Escape') App.menu();
+  } else if (m === 'hangar') {
+    const i = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+    if (i >= 0) App.selHangar(i % 3);
+    if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.pickHangar(); }
   } else if (m === 'continue') {
     if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.cont(); }
     if (e.code === 'Escape') App.end();
@@ -3083,6 +3934,8 @@ cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', endDrag);
 
 $('startBtn').addEventListener('click', () => App.openSetup());
+$('resumeRunBtn').addEventListener('click', () => App.resume());
+$('hangarGo').addEventListener('click', () => App.pickHangar());
 $('launchBtn').addEventListener('click', () => App.start('shooter'));
 $('setupBackBtn').addEventListener('click', () => App.menu());
 $('contYes').addEventListener('click', () => App.cont());
@@ -3101,6 +3954,41 @@ function drawPreview(canvas, plane) {
   ctx.restore();
   ctx = saved;
 }
+/* hangar screen (part 2) */
+function renderHangar() {
+  const h = App.hangar;
+  if (!h) return;
+  const list = $('hangarList'), info = $('hangarInfo');
+  $('hangarEyebrow').textContent = `회수 작전 · ${h.chapter} / ${h.total}`;
+  list.textContent = '';
+  list.style.gridTemplateColumns = `repeat(${h.choices.length}, minmax(0, 1fr))`;
+  h.choices.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'plane';
+    btn.setAttribute('aria-pressed', String(i === h.sel));
+    const cvs = document.createElement('canvas'); cvs.width = 264; cvs.height = 136;
+    const name = document.createElement('b'); name.textContent = c.name;
+    const sub = document.createElement('span'); sub.className = 'pdesc'; sub.textContent = `${i + 1} · ${c.title}`;
+    btn.append(cvs, name, sub);
+    btn.addEventListener('click', () => App.selHangar(i));
+    list.append(btn);
+    drawCraftPreview(cvs, c);
+  });
+  const c = h.choices[h.sel];
+  info.textContent = '';
+  const add = (cls, text) => { const el = document.createElement('span'); el.className = cls; el.textContent = text; info.append(el); return el; };
+  add('pi-name', `${c.title} ${c.name}`);
+  add('pi-story', c.story);
+  add('pi-kit', `무기 ${c.weaponName} · 폭탄 ${c.bombName} · 필살기 ${c.ultName}`);
+  const stat = add('pstat', '');
+  ['속도', '내구', '화력'].forEach((lab, k) => {
+    const l = document.createElement('span'); l.textContent = lab;
+    const pipsEl = document.createElement('span'); pipsEl.className = 'pips';
+    for (let n = 0; n < 5; n++) { const d = document.createElement('i'); if (n < c.stats[k]) d.className = 'on'; pipsEl.append(d); }
+    stat.append(l, pipsEl);
+  });
+  $('hangarNote').textContent = h.choices.length > 1 ? '고른 기체는 이번 회수 작전(4구간)이 끝나면 엔딩을 보고 은퇴해요.' : '남은 회수 기체는 이 기체 하나예요.';
+}
 function renderSetup() {
   const list = $('planeList'), seg = $('diffList'), info = $('pilotInfo');
   if (!setupBuilt) {
@@ -3111,7 +3999,8 @@ function renderSetup() {
       const c = document.createElement('canvas'); c.width = 264; c.height = 136;
       const name = document.createElement('b'); name.textContent = pl.pilot.name;
       const sub = document.createElement('span'); sub.className = 'pdesc'; sub.textContent = `${i + 1} · ${pl.name}`;
-      btn.append(c, name, sub);
+      const star = document.createElement('span'); star.className = 'pend';
+      btn.append(c, name, sub, star);
       btn.addEventListener('click', () => App.setSetup('plane', i));
       list.append(btn);
       drawPreview(c, pl);
@@ -3123,7 +4012,12 @@ function renderSetup() {
       seg.append(b);
     });
   }
-  [...list.children].forEach((b, i) => b.setAttribute('aria-pressed', String(i === App.setup.plane)));
+  [...list.children].forEach((b, i) => {
+    b.setAttribute('aria-pressed', String(i === App.setup.plane));
+    const seen = Save.seenEnding(PLANES[i].pilot.id);
+    b.querySelector('.pend').textContent = seen ? '★ 엔딩' : '';
+    b.title = seen ? '엔딩을 봤어요' : '';
+  });
   [...seg.children].forEach((b, i) => b.setAttribute('aria-checked', String(i === App.setup.diff)));
   $('diffDesc').textContent = DIFFS[App.setup.diff].desc;
   const pl = PLANES[App.setup.plane], boss = BOSS_INFO[pl.pilot.link];
@@ -3133,6 +4027,8 @@ function renderSetup() {
   add('pi-story', pl.pilot.story);
   add('pi-link', `인연의 보스: ${boss.title} ${boss.name}`);
   add('pi-kit', `무기 ${pl.weaponName} · 폭탄 ${pl.bombName}`);
+  const rb = Save.best(App.setup.plane, App.setup.diff), cl = Save.clears(App.setup.plane, App.setup.diff);
+  add('pi-rec', `${DIFFS[App.setup.diff].name} 최고 ${fmt(rb.all)} · 노컨티뉴 ${rb.nc ? fmt(rb.nc) : '없음'}` + (cl.nc ? ' · 노컨티뉴 클리어' : cl.clear ? ' · 클리어' : ''));
   const stat = add('pstat', '');
   ['속도', '내구', '화력'].forEach((lab, k) => {
     const l = document.createElement('span'); l.textContent = lab;
@@ -3151,14 +4047,14 @@ $('bombBtn').addEventListener('click', () => { if (App.game && App.game.bomb) Ap
 $('ultBtn').addEventListener('click', () => { if (App.game && App.game.ult) App.game.ult(); });
 $('soundBtn').addEventListener('click', e => {
   muted = !muted; initAudio();
-  try { localStorage.setItem('cloudsea-sound', muted ? 'off' : 'on'); } catch (err) {}
+  Save.set('sound', !muted);
   e.currentTarget.blur();
   syncUI();
 });
 $('musicBtn').addEventListener('click', e => {
   e.currentTarget.blur();
   musicOn = !musicOn; initAudio();
-  try { localStorage.setItem('cloudsea-music', musicOn ? 'on' : 'off'); } catch (e) {}
+  Save.set('music', musicOn);
   syncUI();
 });
 
@@ -3179,7 +4075,7 @@ function update(dt) {
   flashT = Math.max(0, flashT - dt);
   if (App.mode === 'menu' || App.mode === 'setup') { updateSky(dt); updateParts(dt); menuProp += dt * 40; }
   else if (App.mode === 'play') { App.game.update(dt); updateParts(dt); }
-  else if (App.mode === 'over' || App.mode === 'continue') { updateSky(dt, 0.4); updateParts(dt); }
+  else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar') { updateSky(dt, 0.4); updateParts(dt); }
 }
 function draw() {
   ctx.save();
@@ -3193,7 +4089,7 @@ function draw() {
   }
   ctx.restore();
   if (flashT > 0) { ctx.fillStyle = `rgba(${flashColor},${Math.min(0.85, flashT * 1.2)})`; ctx.fillRect(0, 0, W, H); }
-  if (App.game && App.mode !== 'menu' && App.mode !== 'over') { App.game.hud(); drawBanner(); }
+  if (App.game && App.mode !== 'menu' && App.mode !== 'over' && App.mode !== 'hangar') { App.game.hud(); drawBanner(); }
 }
 let last = performance.now();
 function frame(now) {
