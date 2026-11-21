@@ -259,7 +259,6 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
         <li><b>사격</b></li><li>자동</li>
         <li><b>폭탄</b></li><li>X 키 · 폭탄 버튼</li>
         <li><b>편대 필살기</b></li><li>C 키 · 편대 버튼 (스테이지마다 1번)</li>
-        <li><b>정밀 이동</b></li><li>Shift</li>
         <li><b>일시정지</b></li><li>P · Esc</li>
       </ul>
       <div class="actions">
@@ -1518,7 +1517,7 @@ function drawBanner() {
 
 /* ================= input ================= */
 const keys = {};
-const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', ShiftLeft: 'slow', ShiftRight: 'slow', Space: 'space' };
+const KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', Space: 'space' };
 let drag = null;
 function toLogical(e) {
   const r = cv.getBoundingClientRect();
@@ -1766,19 +1765,19 @@ function drawDialogue(line, shown, more) {
 
 /* ================= game 1: 구름바다 요격전 ================= */
 const PLANES = [
-  { id: 'swallow', name: '제비', speed: 380, slow: 180, hp: 4, dmg: 0.8, hit: 3,
+  { id: 'swallow', name: '제비', speed: 380, hp: 4, dmg: 0.8, hit: 3,
     weapon: 'needle', weaponName: '연사 바늘', bomb: 'storm', bombName: '번개 폭풍',
     pilot: { id: 'narae', name: '한나래', link: 'whale', story: '새벽 편대 정비사의 딸. 구름고래에 탔던 어머니의 마지막 무전을 찾아 조종간을 잡았다.' },
     look: { kind: 'swallow', accent: '#3fa7ff', wing: '#e3ecf5', body: '#f4f8fc', scale: 0.95 }, stats: [5, 2, 4] },
-  { id: 'hawk', name: '매', speed: 310, slow: 150, hp: 5, dmg: 1, hit: 4,
+  { id: 'hawk', name: '매', speed: 310, hp: 5, dmg: 1, hit: 4,
     weapon: 'spread', weaponName: '확산탄', bomb: 'fire', bombName: '화염 융단',
     pilot: { id: 'maru', name: '강마루', link: 'twin', story: '새벽 편대의 유일한 생환자. 혼자 돌아온 3년을 끝내려고 다시 출격한다.' },
     look: { kind: 'hawk', accent: '#ff8a3d', wing: '#efe3c8', body: '#fbf4e6', scale: 1 }, stats: [3, 3, 4] },
-  { id: 'ox', name: '황소', speed: 250, slow: 125, hp: 7, dmg: 1.25, hit: 5,
+  { id: 'ox', name: '황소', speed: 250, hp: 7, dmg: 1.25, hit: 5,
     weapon: 'cannon', weaponName: '관통 포탄', bomb: 'shock', bombName: '대지 충격파',
     pilot: { id: 'bawi', name: '도바위', link: 'boss', story: '수호 요새 방패별을 설계한 기술자. 자기가 만든 것을 자기 손으로 부수러 간다.' },
     look: { kind: 'ox', accent: '#d84f4f', wing: '#d9cdb0', body: '#ece2cc', scale: 1 }, stats: [2, 5, 4] },
-  { id: 'owl', name: '올빼미', speed: 300, slow: 150, hp: 5, dmg: 0.9, hit: 4,
+  { id: 'owl', name: '올빼미', speed: 300, hp: 5, dmg: 0.9, hit: 4,
     weapon: 'homing', weaponName: '유도 미사일', bomb: 'meteor', bombName: '달빛 유성우',
     pilot: { id: 'saebyeok', name: '윤새벽', link: 'dread', story: '사라진 편대장 윤하늘의 동생. 무인 함대의 통제 신호를 쫓다가 언니의 목소리를 들었다.' },
     look: { kind: 'owl', accent: '#c9b6ff', wing: '#4a5490', body: '#6570b8', scale: 1 }, stats: [3, 3, 3] },
@@ -1793,7 +1792,7 @@ const BOSS_ORDER = ['whale', 'twin', 'beacon', 'nest', 'cloud', 'boss', 'ace', '
 /* ================= part 2: recovered boss craft ================= */
 // look.kind 'craft' draws the boss art (look.type) shrunk by look.art and turned to face up
 const CRAFTS = [
-  { id: 'c_twin', type: 'twin', name: '해와 달', ga: '가', title: '쌍둥이 전투기', speed: 340, slow: 165, hp: 6, dmg: 1, hit: 4,
+  { id: 'c_twin', type: 'twin', name: '해와 달', ga: '가', title: '쌍둥이 전투기', speed: 340, hp: 6, dmg: 1, hit: 4,
     weapon: 'twin', weaponName: '교차 사격', bomb: 'eclipse', bombName: '일식', ult: 'crossfire', ultName: '쌍둥이 돌격',
     story: '새벽 편대 2번기와 3번기. 둘이 함께 날며 양쪽에서 교차 사격을 퍼붓는다.',
     look: { kind: 'craft', type: 'twin', art: 0.46, accent: '#ffb347', scale: 1 }, stats: [4, 4, 5],
@@ -1801,7 +1800,7 @@ const CRAFTS = [
       '해와 달은 새벽 편대 2번기와 3번기의 자리로 돌아갔다.',
       '격납고 맨 끝, 두 기체는 언제나 나란히 세워져 있다.',
       '출격 신호가 울리면, 둘은 지금도 동시에 시동을 건다.'] } },
-  { id: 'c_beacon', type: 'beacon', name: '길잡이', ga: '가', title: '등대선', speed: 300, slow: 150, hp: 6, dmg: 1, hit: 4,
+  { id: 'c_beacon', type: 'beacon', name: '길잡이', ga: '가', title: '등대선', speed: 300, hp: 6, dmg: 1, hit: 4,
     weapon: 'lamp', weaponName: '회전 등불', bomb: 'flash', bombName: '등대 섬광', ult: 'searchlight', ultName: '항로 안내',
     story: '항로를 밝히던 등대선. 좌우로 훑는 등불 탄을 쏘고, 섬광으로 적을 잠시 멈춰 세운다.',
     look: { kind: 'craft', type: 'beacon', art: 0.5, accent: '#ffd966', scale: 1 }, stats: [3, 4, 4],
@@ -1809,7 +1808,7 @@ const CRAFTS = [
       '길잡이는 다시 등대가 되었다.',
       '그 불빛은 이제 표적이 아니라, 돌아오는 길을 비춘다.',
       '구름바다의 조종사들은 길잡이를 보고 집으로 향한다.'] } },
-  { id: 'c_nest', type: 'nest', name: '까마귀 둥지', ga: '가', title: '보급 모함', speed: 290, slow: 145, hp: 6, dmg: 1, hit: 5,
+  { id: 'c_nest', type: 'nest', name: '까마귀 둥지', ga: '가', title: '보급 모함', speed: 290, hp: 6, dmg: 1, hit: 5,
     weapon: 'drone', weaponName: '호위 무인기', bomb: 'drones', bombName: '무인기 출격', ult: 'swarm', ultName: '둥지 총출격',
     story: '보급 모함. 주위를 도는 무인기들이 적을 쫓아가 쏜다. 화력이 오를수록 무인기가 늘어난다.',
     look: { kind: 'craft', type: 'nest', art: 0.3, accent: '#c9a3ff', scale: 1 }, stats: [3, 4, 5],
@@ -1817,7 +1816,7 @@ const CRAFTS = [
       '까마귀 둥지의 생산 설비가 멈췄다.',
       '빈 격납고에는 이제 무인기 대신 새 조종사들의 기체가 들어선다.',
       '둥지는 더 이상 기다리지 않는다. 돌아온 이들이 여기 있으니까.'] } },
-  { id: 'c_cloud', type: 'cloud', name: '먹구름', ga: '이', title: '기상 관측선', speed: 300, slow: 150, hp: 6, dmg: 1, hit: 4,
+  { id: 'c_cloud', type: 'cloud', name: '먹구름', ga: '이', title: '기상 관측선', speed: 300, hp: 6, dmg: 1, hit: 4,
     weapon: 'rain', weaponName: '소나기 연사', bomb: 'thunder', bombName: '벼락 기둥', ult: 'front', ultName: '폭풍 전선',
     story: '기상 관측선. 곧게 뻗는 빗줄기 탄을 여러 줄로 퍼부어 넓은 폭을 한꺼번에 쓸어 낸다.',
     look: { kind: 'craft', type: 'cloud', art: 0.3, accent: '#9fc6ff', scale: 1 }, stats: [3, 4, 4],
@@ -1825,7 +1824,7 @@ const CRAFTS = [
       '먹구름은 기상 관측선으로 돌아갔다.',
       '매일 아침, 편대에 날씨를 알려 주는 목소리가 다시 들린다.',
       '오늘의 예보는 맑음. 이번에는 정말로.'] } },
-  { id: 'c_fortress', type: 'boss', name: '방패별', ga: '이', title: '수호 요새', speed: 230, slow: 120, hp: 8, dmg: 1.1, hit: 5,
+  { id: 'c_fortress', type: 'boss', name: '방패별', ga: '이', title: '수호 요새', speed: 230, hp: 8, dmg: 1.1, hit: 5,
     weapon: 'spiral', weaponName: '요새 주포', bomb: 'shield', bombName: '반사 방패', ult: 'barrage', ultName: '요새 포격',
     story: '수호 요새. 가장 느리지만 가장 단단하다. 적을 꿰뚫고 터지는 주포를 쏘고, 탄을 튕겨 내는 방패를 편다.',
     look: { kind: 'craft', type: 'boss', art: 0.28, accent: '#ff8a6d', scale: 1 }, stats: [1, 5, 4],
@@ -1833,7 +1832,7 @@ const CRAFTS = [
       '방패별은 도시 위로 돌아가 다시 방패가 되었다.',
       '이번에는 사람이 조종석에 앉아, 무엇을 지킬지 정한다.',
       '도시의 아이들은 가장 밝은 별을 방패별이라 부른다.'] } },
-  { id: 'c_ace', type: 'ace', name: '새벽별', ga: '이', title: '편대장기', speed: 410, slow: 190, hp: 5, dmg: 1.1, hit: 3,
+  { id: 'c_ace', type: 'ace', name: '새벽별', ga: '이', title: '편대장기', speed: 410, hp: 5, dmg: 1.1, hit: 3,
     weapon: 'burst', weaponName: '정밀 점사', bomb: 'dash', bombName: '새벽 돌진', ult: 'dawnrun', ultName: '새벽 비행',
     story: '편대장 윤하늘의 기체. 가장 빠르고, 짧게 끊어 쏘는 점사가 정확하다.',
     look: { kind: 'craft', type: 'ace', art: 0.8, accent: '#ffd966', scale: 1 }, stats: [5, 3, 4],
@@ -1841,7 +1840,7 @@ const CRAFTS = [
       '새벽별은 편대장 윤하늘의 이름과 함께 기념관에 놓였다.',
       '단 하루, 새벽 편대가 만들어진 날에만 그 엔진에 불이 붙는다.',
       '그날 하늘에는 언제나 하얀 비행운 한 줄이 그어진다.'] } },
-  { id: 'c_dread', type: 'dread', name: '폭풍눈', ga: '이', title: '통제함', speed: 280, slow: 140, hp: 7, dmg: 1.2, hit: 5,
+  { id: 'c_dread', type: 'dread', name: '폭풍눈', ga: '이', title: '통제함', speed: 280, hp: 7, dmg: 1.2, hit: 5,
     weapon: 'storm', weaponName: '번개 지휘', bomb: 'tempest', bombName: '대폭풍', ult: 'fleet', ultName: '함대 지휘',
     story: '함대의 두뇌였던 통제함. 번개로 가장 가까운 적을 직접 내리치고, 은퇴한 기체들을 불러 모은다.',
     look: { kind: 'craft', type: 'dread', art: 0.27, accent: '#b48cff', scale: 1 }, stats: [3, 5, 5],
@@ -3540,7 +3539,7 @@ function makeShooter() {
         return;
       }
       const { mx, my } = moveInput();
-      const sp = keys.slow ? P.slow : P.speed;
+      const sp = P.speed;
       let dxMove = mx * sp * dt;
       p.x += dxMove; p.y += my * sp * dt;
       if (drag && anchor) {
@@ -3684,10 +3683,6 @@ function makeShooter() {
           glowDot(player.x, player.y, 66, '255,200,150', 0.22);
           ctx.strokeStyle = `rgba(255,200,150,${0.5 + 0.3 * Math.sin(time * 10)})`; ctx.lineWidth = 4;
           ctx.beginPath(); ctx.arc(player.x, player.y, 60, 0, TAU); ctx.stroke();
-        }
-        if (keys.slow) {
-          ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ff4d6d'; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(player.x, player.y, P.hit, 0, TAU); ctx.fill(); ctx.stroke();
         }
       }
       drawParts();
