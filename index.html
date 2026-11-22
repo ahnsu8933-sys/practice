@@ -273,6 +273,14 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
   text-align: left; font: 12px var(--body); color: var(--muted);
   background: rgba(255, 154, 74, 0.12); border: 1px dashed var(--flare); border-radius: 10px; cursor: pointer;
 }
+.gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 420px; }
+.gcard { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 4px 4px 6px; color: var(--ink); font: 11px var(--body); background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; cursor: pointer; }
+.gcard canvas { width: 100%; height: auto; aspect-ratio: 160 / 100; border-radius: 7px; display: block; }
+.gcard b { font: 12px var(--display); font-weight: 400; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gcard span { color: var(--muted); font-size: 10px; }
+.gcard.locked b { color: var(--muted); }
+.gcard[aria-pressed="true"] { border-color: var(--flare); background: rgba(255, 154, 74, 0.2); box-shadow: inset 0 0 0 1px var(--flare); }
+.gcard:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
 .lockmsg { margin: 0; padding: 6px 12px; font: 14px var(--display); letter-spacing: 0.03em; color: #ffd966; background: rgba(255, 217, 102, 0.12); border: 1px solid rgba(255, 217, 102, 0.5); border-radius: 8px; }
 .card-sub b { font: 14px var(--display); font-weight: 400; color: var(--flare); letter-spacing: 0.03em; }
 .card-sub:hover { background: rgba(255, 154, 74, 0.22); }
@@ -281,6 +289,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 @media (max-height: 900px) { #menuScr .lead, #menuScr .keys { display: none; } }
 @media (max-width: 520px), (max-height: 600px) { #pauseScr .keys { display: none; } }
 @media (max-width: 370px), (max-height: 560px) { #hangarScr.endless h2 { display: none; } }
+@media (max-width: 520px), (max-height: 760px) { .gcard span { display: none; } .gcard b { font-size: 10.5px; } #galleryScr .eyebrow { font-size: 11px; } }
 .linkbtn { background: none; border: 0; padding: 4px 6px; color: var(--muted); font: 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .linkbtn:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
 #storyCta { max-width: 32ch; color: #ffd3a8; }
@@ -311,11 +320,11 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
       </ul>
       <div class="games" id="modeList">
         <button class="card" id="mode0" type="button"><span class="card-key">1</span><span class="card-body"><span class="badge" id="freshBadge" hidden>처음이라면 여기부터</span><b>3분 출격</b><span>3분 동안 점수를 겨루는 스코어 어택이에요. 탄을 아슬아슬하게 스치면 점수가 붙어요.</span></span><span class="card-best">최고<strong id="bestAttack">0</strong></span></button>
-        <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 40스테이지, 엔딩 12개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/12</strong></span></button>
+        <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 33스테이지, 엔딩 12개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/12</strong></span></button>
         <button class="card-sub" id="resumeRunBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="runInfo"></span></button>
         <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
       </div>
-      <p class="small"><span class="kbd-hint">↑↓ 고르기 · Enter 시작<span id="resumeKeyHint" hidden> · R 이어서</span> · </span>스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="vibeMenuBtn" type="button" hidden>진동 켬</button></p>
+      <p class="small"><span class="kbd-hint">↑↓ 고르기 · Enter 시작<span id="resumeKeyHint" hidden> · R 이어서</span> · </span>스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="galleryBtn" type="button">엔딩 갤러리</button> <button class="linkbtn" id="vibeMenuBtn" type="button" hidden>진동 켬</button></p>
      </div>
     </div>
 
@@ -371,10 +380,24 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
      </div>
     </div>
 
+    <div class="overlay" id="galleryScr" hidden>
+     <div class="menu-inner" id="galleryInner">
+      <p class="eyebrow" id="galleryCount">엔딩 0 / 12</p>
+      <h2>엔딩 갤러리</h2>
+      <div class="gallery" id="galleryList"></div>
+      <div class="pinfo" id="galleryInfo"></div>
+      <div class="actions">
+        <button class="btn" id="galleryPlay" type="button">다시 보기</button>
+        <button class="btn ghost" id="galleryBack" type="button">뒤로</button>
+      </div>
+      <p class="small kbd-hint">방향키 고르기 · Enter 다시 보기 · Esc 뒤로</p>
+     </div>
+    </div>
+
     <div class="overlay" id="ruleScr" hidden>
       <p class="eyebrow" id="ruleEyebrow">무한 모드</p>
       <h2>변이 규칙</h2>
-      <p class="lead">하나를 고르면 지금 규칙을 대신해요. 고를 때마다 점수 배율이 0.3씩 올라요 (최대 ×2.8).</p>
+      <p class="lead">규칙은 3개까지 쌓이고, 하나마다 점수 배율이 0.3씩 올라요 (최대 ×1.9). 3개가 차면 가장 오래된 규칙이 빠져요.</p>
       <div class="games" id="ruleList"></div>
       <p class="small" id="ruleNow"></p>
       <p class="small">1~3 선택</p>
@@ -497,6 +520,7 @@ const Save = (() => {
 function fitMenu() {
   fitScreen('menuScr', 'menuInner');
   fitScreen('hangarScr', 'hangarInner');
+  fitScreen('galleryScr', 'galleryInner');
 }
 function fitScreen(screenId, innerId) {
   const m = document.getElementById(screenId), inner = document.getElementById(innerId);
@@ -1990,10 +2014,10 @@ const PLANES = [
     weapon: 'spread', weaponName: '확산탄', bomb: 'fire', bombName: '화염 융단',
     pilot: { id: 'maru', name: '강마루', link: 'twin', story: '새벽 편대의 유일한 생환자. 혼자 돌아온 3년을 끝내려고 다시 출격한다.' },
     look: { kind: 'hawk', accent: '#ff8a3d', wing: '#efe3c8', body: '#fbf4e6', scale: 1 }, stats: [3, 3, 4] },
-  { id: 'ox', name: '황소', speed: 250, hp: 7, dmg: 1.25, hit: 5,
+  { id: 'ox', name: '황소', speed: 250, hp: 6, dmg: 1.25, hit: 5,
     weapon: 'cannon', weaponName: '관통 포탄', bomb: 'shock', bombName: '대지 충격파',
     pilot: { id: 'bawi', name: '도바위', link: 'boss', story: '수호 요새 방패별을 설계한 기술자. 자기가 만든 것을 자기 손으로 부수러 간다.' },
-    look: { kind: 'ox', accent: '#d84f4f', wing: '#d9cdb0', body: '#ece2cc', scale: 1 }, stats: [2, 5, 4] },
+    look: { kind: 'ox', accent: '#d84f4f', wing: '#d9cdb0', body: '#ece2cc', scale: 1 }, stats: [2, 4, 4] },
   { id: 'owl', name: '올빼미', speed: 300, hp: 5, dmg: 0.9, hit: 4,
     weapon: 'homing', weaponName: '유도 미사일', bomb: 'meteor', bombName: '달빛 유성우',
     pilot: { id: 'saebyeok', name: '윤새벽', link: 'dread', story: '사라진 편대장 윤하늘의 동생. 무인 함대의 통제 신호를 쫓다가 언니의 목소리를 들었다.' },
@@ -2009,7 +2033,7 @@ const BOSS_ORDER = ['whale', 'twin', 'beacon', 'nest', 'cloud', 'boss', 'ace', '
 /* ================= part 2: recovered boss craft ================= */
 // look.kind 'craft' draws the boss art (look.type) shrunk by look.art and turned to face up
 const CRAFTS = [
-  { id: 'c_twin', type: 'twin', name: '해와 달', ga: '가', title: '쌍둥이 전투기', speed: 340, hp: 6, dmg: 1, hit: 4,
+  { id: 'c_twin', type: 'twin', name: '해와 달', ga: '이', title: '쌍둥이 전투기', speed: 340, hp: 6, dmg: 1, hit: 4,
     weapon: 'twin', weaponName: '교차 사격', bomb: 'eclipse', bombName: '일식', ult: 'crossfire', ultName: '쌍둥이 돌격',
     story: '새벽 편대 2번기와 3번기. 둘이 함께 날며 양쪽에서 교차 사격을 퍼붓는다.',
     look: { kind: 'craft', type: 'twin', art: 0.46, accent: '#ffb347', scale: 1 }, stats: [4, 4, 5],
@@ -2121,7 +2145,7 @@ function makeShooter() {
     corners: i => ({ x: i % 2 ? W - 70 : 70, y: -40 - i * 30 }),
     arc: (i, n) => ({ x: W / 2 + (i - (n - 1) / 2) * 70, y: -40 - Math.abs(i - (n - 1) / 2) * 30 }),
   };
-  // endless mutation rules: every 5 stages pick one of three; it replaces the current rule. Each change adds 0.3 to the score multiplier (up to x2.8)
+  // endless mutation rules: every 5 stages pick one of three; up to three stack (x1.3 each step, x1.9 at most), a fourth replaces the oldest
   const RULES = {
     storm: { name: '뇌우', desc: '작은 뇌운 속에 적이 숨어요. 구름이 번쩍이면 그 아래로 번개가 떨어져요.' },
     wind:  { name: '역풍', desc: '옆바람이 불어 적 탄이 바람 방향으로 휘어져요.' },
@@ -2134,21 +2158,22 @@ function makeShooter() {
   const ATTACK_TIME = 180, GRAZE_R = 16;
   const ENTER = { factory: [150, 45], beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
-  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow;
+  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow, gallery;
   let bossDuo, attackT, attackEnd, grazes, grazeSfx, survBonus, ruleWind, stormT, clouds;
   const hasRule = id => !!(camp && camp.rules && camp.rules.includes(id));
   const grazeOn = () => !!(camp && (camp.attack || camp.act === 4));
-  const ruleSteps = () => Math.min(6, camp.ruleCount || 0);
-  const scoreMul = () => (camp && camp.act === 4 ? 1 + 0.3 * ruleSteps() : 1);
-  const ruleName = () => (camp && camp.rules && camp.rules.length ? RULES[camp.rules[0]].name : '없음');
+  const ei = () => stageNo - ((camp && camp.e0) || 41) + 41;
+  const lateK = () => (camp && camp.act === 4 ? Math.min(0.5, 0.012 * Math.max(0, ei() - 53)) : 0);   // slow late pressure after the cap
+  const scoreMul = () => (camp && camp.act === 4 && camp.rules ? 1 + 0.3 * camp.rules.length : 1);
+  const ruleName = () => (camp && camp.rules && camp.rules.length ? camp.rules.map(id => RULES[id].name).join(', ') : '없음');
   const stageLen = () => (camp && camp.attack ? 28 : STAGE_LEN);
   const grow = () => {
     const g = stageNo - 1;
     if (!camp || camp.act === 1) return Math.min(g, 16);
-    if (camp.act === 2 || camp.act === 3) return 7 + (stageNo - 9) * 0.2;   // stage 9 = stage 8, stage 40 ~ stage 14
-    return Math.min(20, 13.4 + (stageNo - 41) * 0.55);   // endless: reaches its cap at stage 53, then rules pile up instead
+    if (camp.act === 2 || camp.act === 3) return 7 + (stageNo - 9) * 0.32;   // stage 9 = stage 8; part 2 ends at 29 (~13.4), the final chapter 30-33
+    return Math.min(20, 13.4 + (ei() - 41) * 0.55);   // endless: reaches its cap 12 stages in, then rules and late pressure take over
   };
-  const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet * (hasRule('fast') ? 1.25 : 1);
+  const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet * (hasRule('fast') ? 1.25 : 1) * (1 + lateK());
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
   const turretsLeft = () => enemies.some(o => o.type === 'turret' && !o.dead);
   const later = (delay, fn) => timers.push({ t: delay, fn });
@@ -2184,8 +2209,8 @@ function makeShooter() {
   function startStage() {
     stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false; ultReady = true;
     setSky(stageNo - 1);
-    const sub = camp.act === 2 ? `회수 작전 ${camp.chapter}/${CRAFTS.length} · ${craftById(camp.craft).name} · ${camp.chStage + 1}/4 구간`
-      : camp.act === 3 ? `마지막 출격 · ${camp.chStage + 1}/4 구간` : camp.act === 4 ? '무한 모드 · ' + P.name + (camp.rules && camp.rules.length ? ' · ' + ruleName() + ' · 점수 ×' + scoreMul().toFixed(1) : '')
+    const sub = camp.act === 2 ? `회수 작전 ${camp.chapter}/${CRAFTS.length} · ${craftById(camp.craft).name} · ${camp.chStage + 1}/3 구간`
+      : camp.act === 3 ? `마지막 출격 · ${camp.chStage + 1}/4 구간` : camp.act === 4 ? '무한 모드 · ' + P.name + (camp.rules && camp.rules.length ? ' · 점수 ×' + scoreMul().toFixed(1) : '') + (lateK() ? ' · 압박 +' + Math.round(lateK() * 100) + '%' : '')
       : camp.attack ? '3분 출격 · ' + sky.name + ' 하늘' : sky.name + ' 하늘';
     showBanner('STAGE ' + stageNo, sub, 2.4);
     if (stageNo === 1) for (const t of [10, 25]) later(t, () => {
@@ -2213,7 +2238,7 @@ function makeShooter() {
     return e;
   }
   function spawnFoes() {
-    const rows = FOE_WAVES.filter(r => stageNo >= r[0]);
+    const rows = FOE_WAVES.filter(r => ei() >= r[0]);
     let w = Math.random() * rows.reduce((a, r) => a + r[1], 0), row = rows[0];
     for (const r of rows) { w -= r[1]; if (w <= 0) { row = r; break; } }
     const [, , type, n, form] = row;
@@ -2314,7 +2339,7 @@ function makeShooter() {
     const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null;
     const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1);
     // endless: every third stage from 43, two bosses at once (the second one a shadow)
-    if (camp.act === 4 && stageNo >= 43 && (stageNo - 41) % 3 === 2) {
+    if (camp.act === 4 && ei() >= 43 && (ei() - 41) % 3 === 2) {
       const a = COMBO.includes(bossKind) ? bossKind : COMBO[Math.floor(Math.random() * COMBO.length)];
       const rest = COMBO.filter(k => k !== a);
       bossKind = a; bossDuo = rest[Math.floor(Math.random() * rest.length)];
@@ -2366,7 +2391,7 @@ function makeShooter() {
     if (storyOn() && !player.dead) {
       const info = BOSS_INFO[bossKind];
       startScene([radioLine(info.story, '기록 · ' + bossLabel()), bossLine(info.intro), pilotLine(PILOT_LINES[P.pilot.id][bossKind][0])], null);
-    } else if (camp.act === 2 && camp.chStage >= 3 && !player.dead) {
+    } else if (camp.act === 2 && camp.chStage >= 2 && !player.dead) {
       startScene([radioLine(PART2.ownShadow(craftById(camp.craft)))], null);
     } else if (bossKind === 'factory' && !player.dead) {
       const info = BOSS_INFO.factory;
@@ -2445,9 +2470,9 @@ function makeShooter() {
       const n = [1, 1, 2, 2, 3][lv - 1], m = [0, 1, 1, 2, 2][lv - 1];
       for (const s of [-1, 1]) for (let i = 0; i < n; i++) {
         const a = -s * 0.03 + (i - (n - 1) / 2) * 0.06;
-        pb.push({ x: p.x + s * 22, y: p.y - 18, vx: Math.sin(a) * 900, vy: -Math.cos(a) * 900, dmg: 1.15 * P.dmg, ang: a, style: s < 0 ? 'pink' : 'cyan' });
+        pb.push({ x: p.x + s * 22, y: p.y - 18, vx: Math.sin(a) * 900, vy: -Math.cos(a) * 900, dmg: 1.0 * P.dmg, ang: a, style: s < 0 ? 'pink' : 'cyan' });
       }
-      for (let i = 0; i < m; i++) pb.push({ x: p.x + (i - (m - 1) / 2) * 8, y: p.y - 24, vx: 0, vy: -900, dmg: 1.15 * P.dmg, ang: 0 });
+      for (let i = 0; i < m; i++) pb.push({ x: p.x + (i - (m - 1) / 2) * 8, y: p.y - 24, vx: 0, vy: -900, dmg: 1.0 * P.dmg, ang: 0 });
       p.cd = 0.085;
     } else if (P.weapon === 'lamp') {
       // 회전 등불: a forward fan that sways gently
@@ -3197,11 +3222,12 @@ function makeShooter() {
     ctx.textAlign = 'center';
     const sa = clamp((t - 6.2) / 0.8, 0, 1);
     ctx.font = '14px "Black Han Sans", sans-serif'; ctx.fillStyle = `rgba(255,217,102,${sa})`;
-    ctx.fillText('최종 점수 ' + fmt(score) + ' · 격추 ' + kills + ' · 이어하기 ' + continues + '번', W / 2, 670);
+    if (!gallery) ctx.fillText('최종 점수 ' + fmt(score) + ' · 격추 ' + kills + ' · 이어하기 ' + continues + '번', W / 2, 670);
+    else { ctx.fillStyle = `rgba(255,217,102,${sa * 0.8})`; ctx.fillText('엔딩 갤러리', W / 2, 670); }
     if (t > 2.5 && Math.floor(t * 2) % 2) {
       ctx.font = '12px "Gowun Dodum", sans-serif'; ctx.fillStyle = 'rgba(246,236,217,0.75)';
       const more = camp.pool.length - 1 + (camp.next < CRAFT_ORDER.length ? 1 : 0) > 0;
-      ctx.fillText('Space · 화면 누르기 ▶ ' + (kind === 'pilot' ? '2부 회수 작전으로' : cr ? (more ? '격납고로' : '마지막 출격으로') : '무한 모드로'), W / 2, 696);
+      ctx.fillText('Space · 화면 누르기 ▶ ' + (gallery ? '갤러리로' : kind === 'pilot' ? '2부 회수 작전으로' : cr ? (more ? '격납고로' : '마지막 출격으로') : '무한 모드로'), W / 2, 696);
     }
     ctx.restore();
   }
@@ -3491,9 +3517,9 @@ function makeShooter() {
     if (camp.act === 1 || camp.act === 4) return { kind: BOSS_ORDER[(stageNo - 1) % BOSS_ORDER.length], shadow: false };
     if (camp.act === 3) return camp.chStage >= 3 ? { kind: 'factory', shadow: false } : { kind: ['nest', 'ace', 'dread'][camp.chStage], shadow: true };
     const own = craftById(camp.craft).type;
-    if (camp.chStage >= 3) return { kind: own, shadow: true };
+    if (camp.chStage >= 2) return { kind: own, shadow: true };
     const others = BOSS_ORDER.filter(t => t !== own);
-    return { kind: others[(camp.chapter * 3 + camp.chStage) % others.length], shadow: true };
+    return { kind: others[(camp.chapter * 2 + camp.chStage) % others.length], shadow: true };
   }
   function saveRun() {
     if (camp.attack) return;
@@ -3504,13 +3530,15 @@ function makeShooter() {
     stageNo++;
     if (camp.act === 2 || camp.act === 3) camp.chStage++;
     if (camp.act === 4) camp.rules = camp.rules || [];
-    if (camp.act === 4 && stageNo > 41 && (stageNo - 41) % 5 === 0) {
-      // three choices, never the rule already in effect
+    if (camp.act === 4 && ei() > 41 && (ei() - 41) % 5 === 0) {
+      // three choices among the rules not in effect; up to three rules stack, a fourth replaces the oldest
       const pick = Object.keys(RULES).filter(k => !camp.rules.includes(k)).sort(() => Math.random() - 0.5).slice(0, 3);
-      const nextMul = 1 + 0.3 * Math.min(6, (camp.ruleCount || 0) + 1);
-      App.openRules(pick.map(id => Object.assign({ id }, RULES[id])), stageNo, camp.rules.map(id => RULES[id].name), nextMul, id => {
-        camp.rules = [id]; camp.ruleCount = (camp.ruleCount || 0) + 1;
-        clouds = null; stormT = 3;
+      const full = camp.rules.length >= 3, nextMul = 1 + 0.3 * Math.min(3, camp.rules.length + 1);
+      App.openRules(pick.map(id => Object.assign({ id }, RULES[id])), stageNo, camp.rules.map(id => RULES[id].name), nextMul, full, id => {
+        camp.rules.push(id);
+        if (camp.rules.length > 3) camp.rules.shift();
+        if (!hasRule('storm')) clouds = null;
+        stormT = 3;
         startStage();
         saveRun();
         later(2.6, () => floatText(W / 2, 160, '변이 규칙 · ' + RULES[id].name + ' · 점수 ×' + scoreMul().toFixed(1), '255,210,160'));
@@ -3655,7 +3683,7 @@ function makeShooter() {
     App.openHangar(endlessChoices(), 0, 0, pickEndless, { endless: true });
   }
   function pickEndless(ch) {
-    camp.act = 4; camp.chStage = -1; camp.rules = [];
+    camp.act = 4; camp.chStage = -1; camp.rules = []; camp.e0 = stageNo + 1;
     if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
     else { camp.craft = null; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
     player.power = Math.max(player.power, 3); player.bombs = Math.max(player.bombs, D.bombs);
@@ -3810,7 +3838,7 @@ function makeShooter() {
       } : normalFinish);
       return;
     }
-    if (camp.act === 2 && camp.chStage >= 3) {
+    if (camp.act === 2 && camp.chStage >= 2) {
       const c = craftById(camp.craft);
       startScene([radioLine(PART2.shadowDown(c)), pilotLine(PART2.thanks(c))], () => {
         Save.markEnding(c.id);
@@ -4148,7 +4176,7 @@ function makeShooter() {
         if (b.hit) continue;
         const d = Math.hypot(b.x - p.x, b.y - p.y);
         if (d < b.r + P.hit) { b.hit = true; hurtPlayer(); break; }
-        if (gz && !b.grazed && d < b.r + P.hit + GRAZE_R) {
+        if (gz && !b.grazed && d < b.r + P.hit + GRAZE_R + (P.hit - 3) * 3) {
           // graze: slipping past a bullet by a hair scores
           b.grazed = true; grazes++;
           score += Math.round(40 * D.score * scoreMul() * (camp.attack ? 1 + 0.15 * (stageNo - 1) : 1));
@@ -4285,18 +4313,27 @@ function makeShooter() {
       bossKind = BOSS_ORDER[0]; ult = null; ultReady = true; ending = null;
       camp = { act: 1, orig: PLANES.indexOf(P), pool: CRAFT_ORDER.slice(0, 3), next: 3, done: [], craft: null, chStage: -1, chapter: 0 };
       finale = null; freezeT = 0; shieldT = 0; droneT = 0; boltT = 0; bossShadow = false;
-      bossDuo = null; attackT = 0; attackEnd = 0; grazes = 0; grazeSfx = 0; survBonus = 0; ruleWind = 0; stormT = 4; clouds = null;
+      gallery = false; bossDuo = null; attackT = 0; attackEnd = 0; grazes = 0; grazeSfx = 0; survBonus = 0; ruleWind = 0; stormT = 4; clouds = null;
       stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false;
       setSky(0);
       if (opts && opts.endless) {
         const ch = opts.endless;
-        camp.act = 4; camp.endless = true; camp.rules = [];
+        camp.act = 4; camp.endless = true; camp.rules = []; camp.e0 = 41;
         if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
         else { camp.orig = ch.orig; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
         player.power = 3; player.bombs = D.bombs + 1;
         stageNo = 40;
         nextStage();
         later(2.6, () => floatText(player.x, player.y - 50, '모의 전투 훈련 · ' + P.name, '220,235,255'));
+        return;
+      }
+      if (opts && opts.gallery) {
+        const g = opts.gallery;
+        gallery = true;
+        camp.orig = g.kind === 'pilot' ? g.plane : App.setup.plane;
+        P = PLANES[camp.orig];
+        player.x = W / 2; player.y = H + 200; player.inv = 999;
+        ending = { t: 0, kind: g.kind, id: g.id, finish: () => App.openGallery() };
         return;
       }
       if (opts && opts.attack) {
@@ -4308,7 +4345,7 @@ function makeShooter() {
       if (run) {
         score = run.score; kills = run.kills; continues = run.continues; stageNo = run.stage; grazes = run.grazes || 0;
         if (run.camp) camp = JSON.parse(JSON.stringify(run.camp)); else if (run.stage > BOSS_ORDER.length) camp.act = 4;
-        if (camp.rules && camp.rules.length > 1) { camp.ruleCount = camp.rules.length; camp.rules = camp.rules.slice(-1); }   // saves from when rules stacked
+        if (camp.rules && camp.rules.length > 3) camp.rules = camp.rules.slice(-3);   // older saves could hold more
         if (camp.craft) setPlane(craftById(camp.craft)); else if (camp.act >= 3) setPlane(finalPlane());
         Object.assign(player, { hp: run.hp, maxHp: run.maxHp, power: run.power, bombs: run.bombs, inv: 3 });
         startStage();
@@ -4421,7 +4458,7 @@ function makeShooter() {
         if (stageTime >= stageLen()) { if (enemies.length === 0 || stageTime >= stageLen() + 4) spawnBoss(); }
         else {
           spawnT -= dt;
-          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn * (hasRule('swarm') ? 0.75 : 1); }
+          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn * (hasRule('swarm') ? 0.75 : 1) / (1 + lateK()); }
         }
       }
       updateWorld(dt);
@@ -4533,6 +4570,7 @@ function makeShooter() {
       }
     },
     hud() {
+      if (gallery) { if (ending) drawEnding(); return; }
       const ext = grazeOn(), top = ext ? 76 : 60;
       panel(10, 10, 168, ext ? 64 : 46);
       label('점수', 20, 16);
@@ -4548,7 +4586,7 @@ function makeShooter() {
         }
       } else label('STAGE ' + stageNo + ' · ' + D.name, 92, 16);
       bigText(fmt(score), 20, 29);
-      if (ext) label('스치기 ' + grazes + (camp.act === 4 ? ' · 점수 ×' + scoreMul().toFixed(1) + ' · ' + ruleName() : ''), 20, 55, '#c9ecff');
+      if (ext) label('스치기 ' + grazes + (camp.act === 4 ? ' · 점수 ×' + scoreMul().toFixed(1) + ' · 규칙 ' + (camp.rules || []).length + (lateK() ? ' · 압박 +' + Math.round(lateK() * 100) + '%' : '') : ''), 20, 55, '#c9ecff');
       const bx = 14, by = H - 106;
       panel(bx - 4, by - 6, 170, 98);
       label('기체', bx + 4, by, '#d8d2ea');
@@ -4605,6 +4643,8 @@ function makeShooter() {
     reason: () => (camp.attack ? (player.dead ? '격추됨' : '시간 종료') : '임무 종료'),
     continueInfo: () => ({ score, stage: stageNo, used: continues }),
     recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, attack: !!camp.attack, planeId: P.id }),
+    endings: ENDINGS,
+    isGallery: () => gallery,
     retryOpts() {
       if (camp.attack) return { attack: true };
       if (camp.endless) { const ch = endlessChoices().find(c => c.id === P.id); if (ch) return { endless: ch }; }
@@ -4615,7 +4655,7 @@ function makeShooter() {
       if (grazeOn()) rows.push(['스치기', grazes + '번']);
       if (camp.attack) rows.push(['생존 보너스', fmt(survBonus)]);
       else rows.push(['이어하기', continues + '번']);
-      if (camp.act === 4) rows.push(['마지막 변이 규칙', ruleName()], ['점수 배율', '×' + scoreMul().toFixed(1)]);
+      if (camp.act === 4) rows.push(['변이 규칙', ruleName()], ['점수 배율', '×' + scoreMul().toFixed(1)]);
       return rows;
     },
   };
@@ -4642,12 +4682,31 @@ const App = {
     else if (i === 1) App.openSetup('story');
     else App.openEndlessHangar();
   },
+  gal: null,
+  openGallery() {
+    initAudio();
+    const list = galleryList();
+    const keep = App.gal && App.gal.sel;
+    App.gal = { list, sel: keep !== null && keep !== undefined ? keep : Math.max(0, list.findIndex(g => g.seen)) };
+    App.game = null; App.mode = 'gallery';
+    flow = { x: 0, y: 1 }; streakAlpha = 0.12; setSky(0); parts = []; banner.t = 0;
+    renderGallery(); syncUI();
+  },
+  selGallery(i) {
+    if (!App.gal || !App.gal.list[i]) return;
+    App.gal.sel = i; renderGallery(); fitMenu();
+  },
+  playGallery() {
+    const g = App.gal && App.gal.list[App.gal.sel];
+    if (App.mode !== 'gallery' || !g || !g.seen) return;
+    App.start('shooter', null, { gallery: g });
+  },
   rule: null,
-  openRules(list, stage, have, nextMul, cb) {
+  openRules(list, stage, have, nextMul, full, cb) {
     App.rule = { list, cb };
     App.mode = 'rule';
     $('ruleEyebrow').textContent = '무한 모드 · STAGE ' + stage;
-    $('ruleNow').textContent = (have.length ? '지금 규칙 ' + have.join(', ') + ' → 고른 규칙으로 바뀌어요 · ' : '') + '고르면 점수 ×' + nextMul.toFixed(1);
+    $('ruleNow').textContent = (have.length ? '지금 규칙 ' + have.join(', ') + (full ? ' → ' + have[0] + ' 빠짐 · ' : ' · ') : '') + '고르면 점수 ×' + nextMul.toFixed(1);
     const box = $('ruleList');
     box.textContent = '';
     list.forEach((r, i) => {
@@ -4721,7 +4780,7 @@ const App = {
     initAudio();
     hitStop = 0; hurtFx = 0; App.rule = null;
     App.hangar = null;
-    if (!run && !(opts && opts.attack)) Save.clearRun();   // the 3-minute mode keeps the saved story run
+    if (!run && !(opts && (opts.attack || opts.gallery))) Save.clearRun();   // the 3-minute mode keeps the saved story run
     const g = GAMES[id];
     App.game = g;
     parts = []; shake = 0; flashT = 0; banner.t = 0; drag = null;
@@ -4784,6 +4843,7 @@ function syncUI() {
   $('setupScr').hidden = m !== 'setup';
   $('contScr').hidden = m !== 'continue';
   $('ruleScr').hidden = m !== 'rule';
+  $('galleryScr').hidden = m !== 'gallery';
   $('bombBtn').hidden = !(m === 'play' && App.game && App.game.hasBomb);
   $('pauseBtn').hidden = m !== 'play' && m !== 'paused';
   $('soundBtn').textContent = muted ? '효과음 끔' : '효과음 켬';
@@ -4795,7 +4855,7 @@ function syncUI() {
   $('resumeRunBtn').hidden = !run;
   const openN = endlessChoices().filter(c => c.unlocked).length;
   [0, 1, 2].forEach(i => $('mode' + i).setAttribute('aria-pressed', String(i === App.menuSel)));
-  $('endlessDesc').textContent = openN ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙이 바뀌어요.' : '엔딩을 본 기체로 끝없이 싸워요. 기체는 스토리 모드에서 열려요.';
+  $('endlessDesc').textContent = openN ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙이 쌓여요.' : '엔딩을 본 기체로 끝없이 싸워요. 기체는 스토리 모드에서 열려요.';
   const eb = $('endlessBestBox');
   eb.textContent = openN ? '최고' : '기체';
   { const st = document.createElement('strong'); st.textContent = openN ? fmt(Save.endlessTop()) : openN + '/11'; eb.append(st); }
@@ -4804,7 +4864,8 @@ function syncUI() {
   for (const id of ['vibeBtn', 'vibeMenuBtn']) { $(id).hidden = !canVibe; $(id).textContent = Save.settings.vibe ? '진동 켬' : '진동 끔'; }
   $('resumeKeyHint').hidden = !run;
   if (run) $('runInfo').textContent = `${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
-  if (m === 'menu' || m === 'hangar') fitMenu();
+  $('galleryBtn').textContent = '엔딩 갤러리 ' + Save.endingCount() + '/12';
+  if (m === 'menu' || m === 'hangar' || m === 'gallery') fitMenu();
 }
 
 /* input wiring */
@@ -4818,6 +4879,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'ArrowDown' || e.code === 'KeyS') App.selMode(App.menuSel + 1);
     if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); App.chooseMode(App.menuSel); }
     if (!e.repeat && e.code === 'KeyR' && Save.run) App.resume();
+    if (!e.repeat && e.code === 'KeyG') App.openGallery();
   } else if (m === 'rule') {
     const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
     if (d >= 0 && !e.repeat) App.pickRule(d % 3);
@@ -4841,10 +4903,19 @@ window.addEventListener('keydown', e => {
     if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.cont(); }
     if (e.code === 'Escape') App.end();
   } else if (m === 'play' || m === 'paused') {
+    if (e.code === 'Escape' && App.game.isGallery && App.game.isGallery()) { App.openGallery(); return; }
     if (e.code === 'KeyP' || e.code === 'Escape') App.pause();
     if (m === 'play' && !e.repeat && App.game.onKey && App.game.onKey(e.code)) return;
     if ((e.code === 'KeyX' || e.code === 'KeyB') && App.game.bomb) App.game.bomb();
     if (e.code === 'KeyC' && !e.repeat && App.game.ult) App.game.ult();
+  } else if (m === 'gallery') {
+    const g = App.gal, n = g ? g.list.length : 0;
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') App.selGallery((g.sel + n - 1) % n);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') App.selGallery((g.sel + 1) % n);
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') App.selGallery((g.sel + n - 4) % n);
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') App.selGallery((g.sel + 4) % n);
+    if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.playGallery(); }
+    if (e.code === 'Escape') App.menu();
   } else if (m === 'over') {
     if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); App.retry(); }
     if (e.code === 'Escape') App.menu();
@@ -4873,6 +4944,9 @@ cv.addEventListener('pointercancel', endDrag);
 
 [0, 1, 2].forEach(i => $('mode' + i).addEventListener('click', () => App.chooseMode(i)));
 $('storyCtaBtn').addEventListener('click', () => App.openSetup('story'));
+$('galleryBtn').addEventListener('click', () => App.openGallery());
+$('galleryPlay').addEventListener('click', () => App.playGallery());
+$('galleryBack').addEventListener('click', () => App.menu());
 for (const id of ['vibeBtn', 'vibeMenuBtn']) $(id).addEventListener('click', () => { Save.set('vibe', !Save.settings.vibe); buzz(40); syncUI(); });
 $('resumeRunBtn').addEventListener('click', () => App.resume());
 $('hangarGo').addEventListener('click', () => App.pickHangar());
@@ -4911,7 +4985,7 @@ function endlessChoices() {
       unlocked: Save.seenEnding(p.pilot.id), hint: `${p.pilot.name} 엔딩을 보면 열려요. 1부 8스테이지를 ${withRo(p.pilot.name)} 끝내세요.` }))
     .concat(CRAFTS.map(c => ({ id: c.id, craft: true, name: c.name, title: c.title, look: c.look, stats: c.stats,
       weaponName: c.weaponName, bombName: c.bombName, ultName: c.ultName, story: c.story,
-      unlocked: Save.seenEnding(c.id), hint: `${c.name} 엔딩을 보면 열려요. 2부 회수 작전에서 ${c.name}${c.ga === '가' ? '를' : '을'} 타고 4구간을 마치세요.` })));
+      unlocked: Save.seenEnding(c.id), hint: `${c.name} 엔딩을 보면 열려요. 2부 회수 작전에서 ${c.name}${c.ga === '가' ? '를' : '을'} 타고 3구간을 마치세요.` })));
 }
 function renderHangar() {
   const h = App.hangar;
@@ -4957,7 +5031,7 @@ function renderHangar() {
   }
   $('hangarNote').textContent = E
     ? `은퇴한 기체들이 모의 전투 훈련에 다시 나서요. 열린 기체 ${h.choices.filter(x => x.unlocked).length} / ${h.choices.length}`
-    : h.choices.length > 1 ? '고른 기체는 이번 회수 작전(4구간)이 끝나면 엔딩을 보고 은퇴해요.' : '남은 회수 기체는 이 기체 하나예요.';
+    : h.choices.length > 1 ? '고른 기체는 이번 회수 작전(3구간)이 끝나면 엔딩을 보고 은퇴해요.' : '남은 회수 기체는 이 기체 하나예요.';
   $('hangarGo').disabled = E && !c.unlocked;
   const none = E && !h.choices.some(x => x.unlocked);
   $('hangarStory').hidden = !(fromMenu && !c.unlocked);
@@ -4977,6 +5051,74 @@ function renderHangar() {
     seg.append(b);
   });
   $('hangarKeys').textContent = E ? '← → 기체 · Enter 출격' + (fromMenu ? ' · Esc 뒤로' : '') : '1~3 기체 · Enter 출격';
+}
+/* ending gallery: twelve endings, each opens once it has been seen */
+function galleryList() {
+  const E = GAMES.shooter.endings;
+  return PLANES.map((p, i) => ({ kind: 'pilot', id: p.pilot.id, plane: i, title: E[p.pilot.id].title, sky: E[p.pilot.id].sky, look: p.look,
+      who: p.pilot.name + ' · ' + p.name, tag: '조종사 엔딩', line: E[p.pilot.id].text[0], hint: `1부 8스테이지를 ${withRo(p.pilot.name)} 끝내면 열려요.` }))
+    .concat(CRAFTS.map(c => ({ kind: 'craft', id: c.id, title: c.ending.title, sky: c.ending.sky, look: c.look,
+      who: c.title + ' ' + c.name, tag: '회수 기체 엔딩', line: c.ending.text[0], hint: `2부 회수 작전에서 ${c.name}${c.ga === '가' ? '를' : '을'} 타고 3구간을 마치면 열려요.` })))
+    .concat([{ kind: 'final', id: 'final', title: FINAL_ENDING.title, sky: FINAL_ENDING.sky, look: null,
+      who: '새벽 편대', tag: '최종 엔딩', line: FINAL_ENDING.text[0], hint: '스토리 모드 최종장(30~33스테이지)에서 복제 공장을 무너뜨리면 열려요.' }])
+    .map(g => Object.assign(g, { seen: Save.seenEnding(g.id) }));
+}
+function drawGalleryThumb(canvas, g) {
+  const saved = ctx;
+  ctx = canvas.getContext('2d');
+  ctx.setTransform(canvas.width / 160, 0, 0, canvas.height / 100, 0, 0);
+  if (!g.seen) {
+    ctx.fillStyle = '#1b1e3a'; ctx.fillRect(0, 0, 160, 100);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.font = '40px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('?', 80, 52);
+  } else {
+    const gr = ctx.createLinearGradient(0, 0, 0, 100);
+    gr.addColorStop(0, g.sky[0]); gr.addColorStop(0.6, g.sky[1]); gr.addColorStop(1, g.sky[2]);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, 160, 100);
+    glowDot(122, 28, 30, '255,232,170', 0.7);
+    ctx.fillStyle = '#fff6da'; ctx.beginPath(); ctx.arc(122, 28, 11, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,248,238,0.85)';
+    for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(i * 40 - 4, 96, 22, 0, TAU); ctx.fill(); }
+    const looks = g.look ? [g.look] : PLANES.map(p => p.look);
+    looks.forEach((lk, i) => {
+      const x = g.look ? 62 : 44 + i * 24, y = g.look ? 50 : 54 - Math.abs(i - 1.5) * 8;
+      drawPlane(x, y, 0, 0, 1, 0.6, Object.assign({}, lk, { noShadow: true, scale: (lk.scale || 1) * (g.look ? 0.85 : 0.45) }));
+    });
+  }
+  ctx = saved;
+}
+function renderGallery() {
+  const G = App.gal;
+  if (!G) return;
+  const list = $('galleryList'), info = $('galleryInfo');
+  const seenN = G.list.filter(g => g.seen).length;
+  $('galleryCount').textContent = `엔딩 ${seenN} / ${G.list.length}` + (seenN === G.list.length ? ' · 모두 모았어요' : '');
+  list.textContent = '';
+  G.list.forEach((g, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'gcard' + (g.seen ? '' : ' locked');
+    b.setAttribute('aria-pressed', String(i === G.sel));
+    b.setAttribute('aria-label', g.seen ? g.title : '잠긴 엔딩');
+    const cv = document.createElement('canvas'); cv.width = 160; cv.height = 100;
+    const nm = document.createElement('b'); nm.textContent = g.seen ? g.title : '???';
+    const tg = document.createElement('span'); tg.textContent = g.tag;
+    b.append(cv, nm, tg);
+    b.addEventListener('click', () => { if (G.sel === i && g.seen) App.playGallery(); else App.selGallery(i); });
+    list.append(b);
+    drawGalleryThumb(cv, g);
+  });
+  const g = G.list[G.sel];
+  info.textContent = '';
+  const add = (cls, text) => { const el = document.createElement('span'); el.className = cls; el.textContent = text; info.append(el); return el; };
+  if (g.seen) {
+    add('pi-name', g.title);
+    add('pi-kit', g.tag + ' · ' + g.who);
+    add('pi-story', '"' + g.line + '"');
+  } else {
+    add('pi-name', '잠긴 엔딩 · ' + g.tag);
+    add('pi-story', g.hint);
+  }
+  $('galleryPlay').disabled = !g.seen;
 }
 function renderSetup() {
   const list = $('planeList'), seg = $('diffList'), info = $('pilotInfo');
@@ -5068,7 +5210,7 @@ function update(dt) {
   if (App.mode === 'menu' || App.mode === 'setup') { updateSky(dt); updateParts(dt); menuProp += dt * 40; }
   hurtFx = Math.max(0, hurtFx - dt);
   if (App.mode === 'play') { if (hitStop > 0) hitStop -= dt; else { App.game.update(dt); updateParts(dt); } }
-  else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar' || App.mode === 'rule') { updateSky(dt, 0.4); updateParts(dt); }
+  else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar' || App.mode === 'rule' || App.mode === 'gallery') { updateSky(dt, 0.4); updateParts(dt); }
 }
 function draw() {
   ctx.save();
