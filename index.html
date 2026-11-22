@@ -1785,7 +1785,7 @@ function moveInput() {
 /* ================= story: 돌아오지 않은 편대 ================= */
 const BOSS_INFO = {
   factory: { name: '무한 복제 공장', title: '최종 목표', lastName: '무한 복제 공장',
-    story: '3년 전 끊긴 통제 신호의 마지막 조각. 쓰러진 기체와 사라진 사람들의 목소리를 모아 두고, 하나도 놓지 못한다.',
+    story: '옛 이름은 실종 기체 귀환 대기소. 한 정비사(한나래의 엄마)와 정비반이 지었다. 통제 신호에 물든 뒤로, 사라진 사람들의 목소리를 모아 두고 하나도 놓지 못한다.',
     intro: '원본 기체 감지. 복제를 시작합니다. 아무것도… 잃지 않도록.',
     last: '…그래. 놓아 줄게. 다들… 잘 가.' },
   beacon: { name: '길잡이', title: '등대선',
@@ -2105,13 +2105,40 @@ const CRAFT_ORDER = CRAFTS.map(c => c.id);
 const craftById = id => CRAFTS.find(c => c.id === id);
 const PART2 = {
   intro: [['관제탑', '폭풍눈의 기록에서 새 신호가 잡혔다. 구름바다 밑바닥, 무한 복제 공장.'],
-          ['정비반', '회수한 보스 기체 일곱 대의 통제 장치를 모두 떼어 냈다. 이제 우리 편이다.'],
+          ['정비반', '빼앗긴 여덟 가운데 편대 기체 일곱 대의 통제 장치를 모두 떼어 냈다. 이제 우리 편이다.'],
+          ['정비반', '구름고래는 피난선이라 편대 기체가 아니다. 승객들을 기리며, 그 자리에 등불을 달아 뒀다.'],
+          ['정비반', '격납고 여덟 칸 중 한 칸은 지금 너희 편대 몫. 나머지 일곱 칸을 채워 와라.'],
           ['관제탑', '공장은 쓰러진 기체의 그림자를 끝없이 찍어 낸다. 회수한 기체로 그림자 함대를 뚫어라.']],
   pilot: { narae: '엄마 배 말고는 다 데려왔네. 좋아, 같이 가자.', maru: '빼앗긴 기체로 빼앗긴 하늘을 되찾는다. 나쁘지 않군.',
            bawi: '정비는 끝났다. 이제 제 몫을 할 차례다.', saebyeok: '언니가 멈춘 함대야. 끝은 우리가 낸다.' },
   ownShadow: c => `그림자 ${c.name} 확인. 네가 탄 기체의 복제판이다. 저걸 넘어야 ${c.name}${c.ga} 완전히 자유로워진다.`,
   shadowDown: c => `그림자 ${c.name} 소멸. ${c.name}의 통제 기록이 완전히 지워졌다.`,
   thanks: c => `${c.name}, 고마웠어. 이제 집에 가서 쉬어.`,
+  // part 1: faint traces of the factory after stages 3 and 5
+  trace: {
+    3: [['관제탑', '…잠깐. 1스테이지에서 격추한 구름고래의 식별 신호가 다시 잡혔다.'], ['관제탑', '위치는 확인 불가. 통신 오류인가… 일단 기록만 해 둔다.']],
+    5: [['관제탑', '그 식별 신호가 또 잡혔다. 이번엔 해와 달, 길잡이 것까지. 구름바다 아래쪽이다.'], ['관제탑', '지금은 폭풍눈이 먼저다. 신호는 계속 추적하겠다.']] },
+  // part 2: records about what the factory was, found after the 3rd and 5th operation (whatever the craft order)
+  record: {
+    3: [['기록 · 회수 기체의 기억 장치', '…실종 기체 귀환 대기소. 돌아오지 못한 편대원의 비행 기록과 무전을 보존한다.'],
+        ['기록 · 설계 책임자 한 정비사', '돌아올 자리를 비워 두지 않을 거예요. 언젠가 다들, 돌아올 수 있게.'],
+        ['정비반', '…한 정비사님. 나래 엄마가 우리 정비반을 이끌고 지은 시설이다.'],
+        ['정비반', '3년 전 피난선에 오르기 전, 마지막으로 남긴 기록이 이거였지.']],
+    5: [['기록 · 귀환 대기소 최종 로그', '…통제 신호 유입. 보존 대상 재정의: 돌아오지 않은 것 → 떠나려는 모든 것.'],
+        ['기록 · 귀환 대기소 최종 로그', '아무것도, 잃지 않는다.'],
+        ['정비반', '지키려던 기록이… 붙잡아 두는 감옥이 됐다는 거군.'],
+        ['관제탑', '작전 목표를 바꾼다. 남은 기체를 데려오고, 귀환 대기소를… 저 공장을 멈추러 간다.']] },
+  recordReply: {
+    3: { narae: '…엄마가 지은 곳이라고? 다들 돌아올 자리를… 엄마가 지키고 있었던 거야?', maru: '한 정비사님 작품이었나. …나래, 괜찮나?',
+         bawi: '한 정비사의 설계라… 그 사람은 볼트 하나도 허투루 안 조였지.', saebyeok: '나래 엄마가 지은 곳… 언니 기록도 거기 있을까.' },
+    5: { narae: '엄마가 지키려던 곳을… 내 손으로 멈춰야 해. 엄마라면, 멈춰 달라고 했을 거야.', maru: '지키는 것과 가두는 것은 다르다. 끝내러 가자.',
+         bawi: '고장 난 설계는 고쳐야지. 멈추는 것도 정비다.', saebyeok: '언니를 붙잡은 것도 저거였어. 이번엔 내가 풀어 줄게.' } },
+  // final: the pilot wavers, the voice presses once more, the tower reads the signal, the pilot decides
+  waver: { narae: '…엄마? 정말 엄마야? 엄마가… 여기 있었어?', maru: '…해야? 달아? 너희, 거기 있었던 거냐.',
+           bawi: '…방패별이 말을 해? 그런 기능은 넣은 적이…', saebyeok: '…언니? 언니 맞지? 3년 동안 거기 있었어?' },
+  voice2: { narae: '나래야, 여기는 엄마가 지은 곳이야. 다들 돌아올 자리야. 부수지 마, 응?', maru: '교관님, 오늘도 대형 유지 잘했죠? 칭찬 한 번만 해 주세요.',
+            bawi: '설계자님, 도면 3번 장 오른쪽 아래. 거기 제 이름 써 주셨잖아요.', saebyeok: '새벽아, 밤에 무서우면 무전 켜 둬. 언니가 듣고 있을게.' },
+  analysis: '신호 분석 완료. 저장된 무전을 이어 붙인 거다. 새로 만든 문장은… 하나도 없다.',
   // each recovered craft speaks with the memory it kept: when it takes off, and when its own shadow is gone
   craftGo: {
     c_twin: '2번기, 3번기 대형 복귀. …교관님 편대에 합류합니다.',
@@ -2150,16 +2177,18 @@ const PART2 = {
     bawi: ['방패별의 목소리', '설계자님, 도면은 여기 다 있어요. 부수지 말고, 다시 지으면 돼요.'],
     saebyeok: ['언니의 목소리', '새벽아, 여기서 같이 있자. 다 있어. 아무도 안 잃어.'] },
   factoryRage: '가지 마. 또 잃을 거야. 또 비어 버릴 거야.',
-  rageReply: { narae: '잃어도 돼. 기억은 내가 들고 갈 거야.', maru: '잃은 걸 붙잡는 게 아니라, 기억하는 거다.',
+  rageReply: { narae: '잃어도 돼. 엄마 목소리는 내가 들고 갈 거야. 여기 말고, 내 무전기에.', maru: '잃은 걸 붙잡는 게 아니라, 기억하는 거다.',
                bawi: '빈자리는 새로 채운다. 그게 사람이 하는 정비다.', saebyeok: '비어도 괜찮아. 새벽은 또 와.' },
   final: [['관제탑', '회수한 기체는 모두 제자리로 돌아갔다.'], ['관제탑', '마지막 출격은 처음 그 기체로. 복제 공장까지 네 구간 남았다.']],
   finalPilot: { narae: '처음 탔던 제비로 끝낼게. 제일 빠르게.', maru: '처음 그 매로 간다. 끝은 늘 처음처럼.',
                 bawi: '황소, 마지막까지 버텨 줘라.', saebyeok: '올빼미, 이제 새벽을 보러 가자.' },
-  factoryPilot: { narae: '엄마는 하늘을 미워하지 말랬어. 붙잡으라고 한 적은 없어!', maru: '내 제자들은 먼저 귀환했다. 그 목소리, 돌려받겠다.',
-                  bawi: '다시 짓는 건 사람이 한다. 복제가 아니라.', saebyeok: '언니는 붙잡지 않았어. 우리를 보내 줬어. 그러니까 나도 보낼게.' },
+  factoryPilot: { narae: '…엄마가 지은 곳이니까, 엄마 대신 내가 멈출게. 엄마는 붙잡으라고 하지 않았어. 하늘을 미워하지 말랬어!',
+                  maru: '그 말은 3년 전에 다 들었다. 이번엔 내가 답할 차례다. 귀환을 허가한다. 놓아 줘라.',
+                  bawi: '그 이름, 내가 써 준 게 맞다. 그래서 안다. 복제는 아무것도 새로 짓지 못해.',
+                  saebyeok: '언니는 지금도 듣고 있어. 이런 신호 말고, 내 기억 속에서. 그러니까 이건 보낼게.' },
   wallDown: '외벽 붕괴 확인! 새벽 편대 전 기체, 복제 공장에 폭격 개시!',
   factoryGone: '복제 공장 완전 파괴. 붙잡혀 있던 신호가 모두 풀려났다.',
-  lastWord: { narae: '엄마, 하늘이 조용해. 이제 정말 집에 갈게.', maru: '새벽 편대, 이번엔 정말 전원 귀환이다.',
+  lastWord: { narae: '엄마, 엄마가 지은 곳 내가 닫았어. 다들 이제 집에 갈 수 있어. 나도 갈게.', maru: '새벽 편대, 이번엔 정말 전원 귀환이다.',
               bawi: '부순 건 여기까지. 이제 지을 차례다.', saebyeok: '언니, 끝났어. 새벽이야.' },
 };
 const FINAL_ENDING = { title: '새벽이 온 하늘', sky: ['#2a3f7a', '#f0a070', '#fff0c8'], text: [
@@ -2451,7 +2480,9 @@ function makeShooter() {
     } else if (bossKind === 'factory' && !player.dead) {
       const info = BOSS_INFO.factory;
       const v = PART2.factoryVoice[P.pilot.id];
-      startScene([radioLine(info.story, '기록 · ' + bossLabel()), bossLine(info.intro), bossLine(v[1], '무한 복제 공장 · ' + v[0]), pilotLine(PART2.factoryPilot[P.pilot.id])], null);
+      const pid = P.pilot.id;
+      startScene([radioLine(info.story, '기록 · ' + bossLabel()), bossLine(info.intro), bossLine(v[1], '무한 복제 공장 · ' + v[0]),
+        pilotLine(PART2.waver[pid]), bossLine(PART2.voice2[pid], '무한 복제 공장 · ' + v[0]), radioLine(PART2.analysis), pilotLine(PART2.factoryPilot[pid])], null);
     }
   }
   function enrage(e) {
@@ -4016,6 +4047,7 @@ function makeShooter() {
       const last = stageNo === BOSS_ORDER.length;
       const info = BOSS_INFO[bossKind], L = PILOT_LINES[P.pilot.id];
       const lines = [bossLine(info.last, info.lastName), pilotLine(L[bossKind][1])];
+      if (PART2.trace[stageNo]) for (const [n, t] of PART2.trace[stageNo]) lines.push(radioLine(t, n));
       if (last) { lines.push(radioLine('통제 신호 소멸 확인. 무인 함대가 멈췄다. 새벽 편대, 귀환을 환영한다.')); for (const t of L.end) lines.push(pilotLine(t)); }
       startScene(lines, last ? () => {
         Save.markEnding(P.pilot.id);
@@ -4027,7 +4059,8 @@ function makeShooter() {
       const c = craftById(camp.craft);
       const t = tie(c);
       startScene([radioLine(PART2.shadowDown(c)), craftLine(c, PART2.craftDone[c.id]), pilotLine(t ? t[1] : PART2.thanks(c)),
-        radioLine(PART2.echo[Math.min(PART2.echo.length, camp.chapter) - 1], '미확인 신호')], () => {
+        radioLine(PART2.echo[Math.min(PART2.echo.length, camp.chapter) - 1], '미확인 신호')]
+        .concat(PART2.record[camp.chapter] ? PART2.record[camp.chapter].map(([n, t]) => radioLine(t, n)).concat([pilotLine(PART2.recordReply[camp.chapter][P.pilot.id])]) : []), () => {
         Save.markEnding(c.id);
         ending = { t: 0, kind: 'craft', id: c.id, finish: retireCraft }; fanfare();
       });
