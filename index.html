@@ -3545,12 +3545,29 @@ function makeShooter() {
       });
       return;
     }
+    if (camp.act === 4 && ei() > 41 && (ei() - 41) % 5 === 3) {
+      App.openHangar(endlessChoices(), 0, 0, ch => {
+        swapEndless(ch);
+        startStage();
+        saveRun();
+      }, { endless: true, midRun: true, current: P.id, stage: stageNo });
+      return;
+    }
     startStage();
     saveRun();
   }
+  // mid-run plane change in endless: power and bombs carry over, the hull keeps its ratio
+  function swapEndless(ch) {
+    if (!ch || ch.id === P.id) return;
+    const ratio = player.hp / player.maxHp, power = player.power, bombs = player.bombs;
+    if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
+    else { camp.craft = null; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
+    player.hp = Math.max(1, Math.ceil(player.maxHp * ratio)); player.power = power; player.bombs = bombs;
+    later(2.6, () => floatText(player.x, player.y - 50, '기체 교대 · ' + P.name, '220,235,255'));
+  }
   const finalPlane = () => refitPlane(camp.endPlane !== undefined ? camp.endPlane : camp.orig);
   function setPlane(def) {
-    P = PLANES.includes(def) ? def : Object.assign({}, def, { pilot: PLANES[camp.orig].pilot });
+    P = PLANES.includes(def) ? def : Object.assign({}, def, { pilot: def.pilot || PLANES[camp.orig].pilot });
     const hp = Math.max(2, P.hp + D.hpBonus);
     player.maxHp = hp; player.hp = hp; player.inv = Math.max(player.inv, 2); player.sub = null; player.burstN = 0;
   }
@@ -3683,7 +3700,7 @@ function makeShooter() {
     App.openHangar(endlessChoices(), 0, 0, pickEndless, { endless: true });
   }
   function pickEndless(ch) {
-    camp.act = 4; camp.chStage = -1; camp.rules = []; camp.e0 = stageNo + 1;
+    camp.act = 4; camp.chStage = -1; camp.rules = []; camp.e0 = stageNo + 1; camp.startPlane = ch.id;
     if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
     else { camp.craft = null; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
     player.power = Math.max(player.power, 3); player.bombs = Math.max(player.bombs, D.bombs);
@@ -4318,11 +4335,11 @@ function makeShooter() {
       setSky(0);
       if (opts && opts.endless) {
         const ch = opts.endless;
-        camp.act = 4; camp.endless = true; camp.rules = []; camp.e0 = 41;
+        camp.act = 4; camp.endless = true; camp.rules = []; camp.e0 = 34; camp.startPlane = ch.id;
         if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
         else { camp.orig = ch.orig; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
         player.power = 3; player.bombs = D.bombs + 1;
-        stageNo = 40;
+        stageNo = 33;   // the menu run starts where the story ends: stage 34
         nextStage();
         later(2.6, () => floatText(player.x, player.y - 50, '모의 전투 훈련 · ' + P.name, '220,235,255'));
         return;
@@ -4642,12 +4659,12 @@ function makeShooter() {
     cinematic: () => !!ending || !!finale,
     reason: () => (camp.attack ? (player.dead ? '격추됨' : '시간 종료') : '임무 종료'),
     continueInfo: () => ({ score, stage: stageNo, used: continues }),
-    recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, attack: !!camp.attack, planeId: P.id }),
+    recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, attack: !!camp.attack, planeId: camp.startPlane || P.id }),
     endings: ENDINGS,
     isGallery: () => gallery,
     retryOpts() {
       if (camp.attack) return { attack: true };
-      if (camp.endless) { const ch = endlessChoices().find(c => c.id === P.id); if (ch) return { endless: ch }; }
+      if (camp.endless) { const ch = endlessChoices().find(c => c.id === (camp.startPlane || P.id)); if (ch) return { endless: ch }; }
       return undefined;
     },
     stats() {
@@ -4738,7 +4755,8 @@ const App = {
   },
   hangar: null,
   openHangar(choices, chapter, total, cb, opts = {}) {
-    App.hangar = { choices, chapter, total, cb, opts, sel: opts.endless ? Math.max(0, choices.findIndex(c => c.unlocked)) : 0 };
+    const cur = opts.current ? choices.findIndex(c => c.id === opts.current) : -1;
+    App.hangar = { choices, chapter, total, cb, opts, sel: cur >= 0 ? cur : opts.endless ? Math.max(0, choices.findIndex(c => c.unlocked)) : 0 };
     App.mode = 'hangar';
     renderHangar();
     syncUI();
@@ -4855,7 +4873,7 @@ function syncUI() {
   $('resumeRunBtn').hidden = !run;
   const openN = endlessChoices().filter(c => c.unlocked).length;
   [0, 1, 2].forEach(i => $('mode' + i).setAttribute('aria-pressed', String(i === App.menuSel)));
-  $('endlessDesc').textContent = openN ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙이 쌓여요.' : '엔딩을 본 기체로 끝없이 싸워요. 기체는 스토리 모드에서 열려요.';
+  $('endlessDesc').textContent = openN ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙과 기체 교대가 번갈아 와요.' : '엔딩을 본 기체로 끝없이 싸워요. 기체는 스토리 모드에서 열려요.';
   const eb = $('endlessBestBox');
   eb.textContent = openN ? '최고' : '기체';
   { const st = document.createElement('strong'); st.textContent = openN ? fmt(Save.endlessTop()) : openN + '/11'; eb.append(st); }
@@ -4898,6 +4916,7 @@ window.addEventListener('keydown', e => {
     if (E && (e.code === 'ArrowUp' || e.code === 'KeyW')) App.selHangar((h.sel + h.choices.length - 4) % h.choices.length);
     if (E && (e.code === 'ArrowDown' || e.code === 'KeyS')) App.selHangar((h.sel + 4) % h.choices.length);
     if (e.code === 'Escape' && E && h.opts.fromMenu) App.menu();
+    if (e.code === 'Escape' && E && h.opts.midRun) { App.selHangar(h.choices.findIndex(c => c.id === h.opts.current)); App.pickHangar(); }
     if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.pickHangar(); }
   } else if (m === 'continue') {
     if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.cont(); }
@@ -4990,9 +5009,9 @@ function endlessChoices() {
 function renderHangar() {
   const h = App.hangar;
   if (!h) return;
-  const E = !!(h.opts && h.opts.endless), fromMenu = E && h.opts.fromMenu;
+  const E = !!(h.opts && h.opts.endless), fromMenu = E && h.opts.fromMenu, mid = E && h.opts.midRun;
   const list = $('hangarList'), info = $('hangarInfo');
-  $('hangarEyebrow').textContent = E ? `무한 모드 · 모의 전투 훈련 · ${DIFFS[App.setup.diff].name}` : `회수 작전 · ${h.chapter} / ${h.total}`;
+  $('hangarEyebrow').textContent = mid ? `무한 모드 · STAGE ${h.opts.stage} 앞 · 기체 교대` : E ? `무한 모드 · 모의 전투 훈련 · ${DIFFS[App.setup.diff].name}` : `회수 작전 · ${h.chapter} / ${h.total}`;
   list.textContent = '';
   list.classList.toggle('compact', E);
   $('hangarScr').classList.toggle('endless', E);
@@ -5004,7 +5023,8 @@ function renderHangar() {
     btn.setAttribute('aria-pressed', String(i === h.sel));
     const cvs = document.createElement('canvas'); cvs.width = 264; cvs.height = 136;
     const name = document.createElement('b'); name.textContent = c.name;
-    const sub = document.createElement('span'); sub.className = 'pdesc'; sub.textContent = locked ? '잠김' : E ? c.title : `${i + 1} · ${c.title}`;
+    const sub = document.createElement('span'); sub.className = 'pdesc'; sub.textContent = locked ? '잠김' : mid && c.id === h.opts.current ? '탑승 중' : E ? c.title : `${i + 1} · ${c.title}`;
+    if (mid && c.id === h.opts.current) { sub.style.color = '#ffd966'; name.textContent = '★ ' + c.name; }
     btn.append(cvs, name, sub);
     btn.addEventListener('click', () => App.selHangar(i));
     list.append(btn);
@@ -5029,16 +5049,20 @@ function renderHangar() {
       stat.append(l, pipsEl);
     });
   }
-  $('hangarNote').textContent = E
+  $('hangarNote').textContent = mid
+    ? '지금 기체로 계속하거나 다른 기체로 바꿔요. 화력·폭탄은 그대로, 기체 내구는 비율대로 이어져요.'
+    : E
     ? `은퇴한 기체들이 모의 전투 훈련에 다시 나서요. 열린 기체 ${h.choices.filter(x => x.unlocked).length} / ${h.choices.length}`
     : h.choices.length > 1 ? '고른 기체는 이번 회수 작전(3구간)이 끝나면 엔딩을 보고 은퇴해요.' : '남은 회수 기체는 이 기체 하나예요.';
   $('hangarGo').disabled = E && !c.unlocked;
+  $('hangarGo').textContent = mid ? (c.id === h.opts.current ? '이대로 계속' : '교대 출격') : '출격';
   const none = E && !h.choices.some(x => x.unlocked);
   $('hangarStory').hidden = !(fromMenu && !c.unlocked);
   $('hangarGo').hidden = none;
   if (none) $('hangarNote').textContent = '아직 열린 기체가 없어요. 스토리 모드를 진행해 엔딩을 보면 그 기체가 여기서 열려요.';
   $('hangarLockMsg').hidden = !(E && !c.unlocked);
   $('hangarLockMsg').textContent = none ? '🔒 열린 기체가 없어요 · 스토리 모드를 진행하세요' : '🔒 잠긴 기체예요 · 스토리 모드에서 엔딩을 보면 열려요';
+  if (mid && c.unlocked) { $('hangarLockMsg').hidden = false; $('hangarLockMsg').textContent = '기체 교대 · STAGE ' + h.opts.stage + ' 앞 · 화력·폭탄은 그대로 이어져요'; }
   $('hangarBack').hidden = !fromMenu;
   const seg = $('hangarDiff');
   seg.hidden = !fromMenu;
@@ -5050,7 +5074,7 @@ function renderHangar() {
     b.addEventListener('click', () => { App.setSetup('diff', i); renderHangar(); });
     seg.append(b);
   });
-  $('hangarKeys').textContent = E ? '← → 기체 · Enter 출격' + (fromMenu ? ' · Esc 뒤로' : '') : '1~3 기체 · Enter 출격';
+  $('hangarKeys').textContent = mid ? '← → 기체 · Enter 출격 · Esc 그대로 계속' : E ? '← → 기체 · Enter 출격' + (fromMenu ? ' · Esc 뒤로' : '') : '1~3 기체 · Enter 출격';
 }
 /* ending gallery: twelve endings, each opens once it has been seen */
 function galleryList() {
