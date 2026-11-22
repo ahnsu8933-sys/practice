@@ -2163,6 +2163,8 @@ function makeShooter() {
   const hasRule = id => !!(camp && camp.rules && camp.rules.includes(id));
   const grazeOn = () => !!(camp && (camp.attack || camp.act === 4));
   const ei = () => stageNo - ((camp && camp.e0) || 41) + 41;
+  const crowdCap = () => 10 + Math.min(3, (camp.rules || []).length);
+  const onScreen = () => enemies.filter(e => !e.isBoss && !e.dead && e.y > -60 && e.y < H + 20).length;
   const lateK = () => (camp && camp.act === 4 ? Math.min(0.5, 0.012 * Math.max(0, ei() - 67)) : 0);   // slow late pressure after the cap
   const scoreMul = () => (camp && camp.act === 4 && camp.rules ? 1 + 0.3 * camp.rules.length : 1);
   const ruleName = () => (camp && camp.rules && camp.rules.length ? camp.rules.map(id => RULES[id].name).join(', ') : '없음');
@@ -2319,7 +2321,7 @@ function makeShooter() {
       for (let i = 0; i < 3; i++) addEnemy('scout', { x: x0, y: -120 - i * 40, x0, amp: rand(20, 50), freq, vy: 135 + 4 * grow(), phase: i * 0.5 });
     }
     if (r < 0.36 || (stageTime < 8 && s === 1)) {
-      const n = Math.max(5, 4 + Math.min(3, Math.floor(grow() / 3)));
+      const n = camp.act === 4 ? 5 : Math.max(5, 4 + Math.min(3, Math.floor(grow() / 3)));
       const x0 = rand(90, W - 90), amp = rand(30, 80), freq = rand(1.6, 2.6);
       for (let i = 0; i < n; i++) addEnemy('scout', { x: x0, y: -30 - i * 44, x0, amp, freq, vy: 125 + 4 * grow(), phase: i * 0.45 });
     } else if (r < 0.58) {
@@ -4475,7 +4477,8 @@ function makeShooter() {
         if (stageTime >= stageLen()) { if (enemies.length === 0 || stageTime >= stageLen() + 4) spawnBoss(); }
         else {
           spawnT -= dt;
-          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn * (hasRule('swarm') ? 0.75 : 1) / (1 + lateK()); }
+          if (spawnT <= 0 && camp.act === 4 && onScreen() >= crowdCap()) spawnT = 0.5;   // endless: wait until the screen thins out
+          else if (spawnT <= 0) { spawnWave(); spawnT = Math.max(camp.act === 4 ? 1.1 : 0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn * (hasRule('swarm') ? 0.75 : 1) / (1 + lateK()); }
         }
       }
       updateWorld(dt);
@@ -4488,9 +4491,10 @@ function makeShooter() {
           escortT -= dt;
           if (escortT <= 0) {
             const nest = b.type === 'nest' || b.type === 'factory';
-            escortT = (nest ? 5 : 3.5) - Math.min(1, 0.1 * grow());
-            if (enemies.filter(e => e.escort && !e.dead).length < 11) {
-              const n = nest ? 4 : grow() >= 4 ? 6 : 5, side = Math.random() < 0.5 ? -1 : 1;
+            const E4 = camp.act === 4;
+            escortT = (nest ? 5 : 3.5) - Math.min(1, 0.1 * grow()) + (E4 ? 1.5 : 0);
+            if (enemies.filter(e => e.escort && !e.dead).length < (E4 ? 7 : 11) && !(E4 && onScreen() >= crowdCap())) {
+              const n = E4 ? 4 : nest ? 4 : grow() >= 4 ? 6 : 5, side = Math.random() < 0.5 ? -1 : 1;
               const x0 = clamp(b.x + side * rand(110, 170), 60, W - 60), freq = rand(1.8, 2.8);
               for (let i = 0; i < n; i++) addEnemy('scout', { x: x0, y: -30 - i * 40, x0, amp: rand(20, 45), freq, vy: 135 + 4 * grow(), phase: i * 0.5, escort: true });
             }
@@ -4498,7 +4502,7 @@ function makeShooter() {
           // a heavy bomber joins now and then, one at a time, on the side away from the boss
           if (b.arrived) heavyT -= dt;
           if (heavyT <= 0) {
-            heavyT = (b.type === 'nest' ? 13 : 10) - Math.min(2, 0.2 * grow());
+            heavyT = (b.type === 'nest' ? 13 : 10) - Math.min(2, 0.2 * grow()) + (camp.act === 4 ? 4 : 0);
             if (!enemies.some(e => e.heavyEscort && !e.dead)) addEnemy('heavy', { x: b.x < W / 2 ? rand(W - 150, W - 90) : rand(90, 150), y: -70, heavyEscort: true });
           }
           if (b.arrived) bossItemT -= dt;
