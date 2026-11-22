@@ -2163,7 +2163,7 @@ function makeShooter() {
   const hasRule = id => !!(camp && camp.rules && camp.rules.includes(id));
   const grazeOn = () => !!(camp && (camp.attack || camp.act === 4));
   const ei = () => stageNo - ((camp && camp.e0) || 41) + 41;
-  const lateK = () => (camp && camp.act === 4 ? Math.min(0.5, 0.012 * Math.max(0, ei() - 53)) : 0);   // slow late pressure after the cap
+  const lateK = () => (camp && camp.act === 4 ? Math.min(0.5, 0.012 * Math.max(0, ei() - 67)) : 0);   // slow late pressure after the cap
   const scoreMul = () => (camp && camp.act === 4 && camp.rules ? 1 + 0.3 * camp.rules.length : 1);
   const ruleName = () => (camp && camp.rules && camp.rules.length ? camp.rules.map(id => RULES[id].name).join(', ') : '없음');
   const stageLen = () => (camp && camp.attack ? 28 : STAGE_LEN);
@@ -2171,7 +2171,7 @@ function makeShooter() {
     const g = stageNo - 1;
     if (!camp || camp.act === 1) return Math.min(g, 16);
     if (camp.act === 2 || camp.act === 3) return 7 + (stageNo - 9) * 0.32;   // stage 9 = stage 8; part 2 ends at 29 (~13.4), the final chapter 30-33
-    return Math.min(20, 13.4 + (ei() - 41) * 0.55);   // endless: reaches its cap 12 stages in, then rules and late pressure take over
+    return Math.min(20, 13.4 + (ei() - 41) * 0.25);   // endless: slow climb; the third rule lands at +15 (~17), the cap at +26, then late pressure
   };
   const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet * (hasRule('fast') ? 1.25 : 1) * (1 + lateK());
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
@@ -2310,7 +2310,7 @@ function makeShooter() {
     }
   }
   function spawnWave() {
-    if (camp.act === 4 && Math.random() < 0.4) { spawnFoes(); return; }
+    if (camp.act === 4 && Math.random() < (ei() >= 56 ? 0.4 : 0.25)) { spawnFoes(); return; }
     const s = stageNo, r = Math.random();
     // stages 2-7: the player is already powered up, so add a small escort squad to some waves
     const extra = grow() >= 1 && grow() <= 6 ? 0.75 : 0;
@@ -2339,7 +2339,7 @@ function makeShooter() {
     const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null;
     const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1);
     // endless: every third stage from 43, two bosses at once (the second one a shadow)
-    if (camp.act === 4 && ei() >= 43 && (ei() - 41) % 3 === 2) {
+    if (camp.act === 4 && ei() >= 57 && (ei() - 41) % 3 === 2) {
       const a = COMBO.includes(bossKind) ? bossKind : COMBO[Math.floor(Math.random() * COMBO.length)];
       const rest = COMBO.filter(k => k !== a);
       bossKind = a; bossDuo = rest[Math.floor(Math.random() * rest.length)];
