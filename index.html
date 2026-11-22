@@ -2733,6 +2733,7 @@ function makeShooter() {
   function ultFx(u, phase) {
     const rgb = ULT_RGB[u.kind] || '255,230,160', p = player;
     if (phase === 'start') {
+      buzz(60);
       parts.push({ kind: 'tint', color: '12,8,30', alpha: 0.42, life: ULT_T1 - ULT_T0 + 0.9, max: ULT_T1 - ULT_T0 + 0.9 });
       parts.push({ kind: 'implode', x: p.x, y: p.y, size: 320, life: 0.3, max: 0.3, color: rgb });
       for (let i = 0; i < 22; i++) later(i * 0.05, () => { const x = rand(0, W), y = rand(0, H); parts.push({ kind: 'streak', x0: x, y0: y + 140, x1: x, y1: y - 140, life: 0.25, max: 0.25, color: i % 3 ? rgb : '255,255,255' }); });
@@ -2744,6 +2745,7 @@ function makeShooter() {
       return;
     }
     // finale
+    buzz([90, 50, 180]);
     const cx = W / 2, cy = H * 0.4;
     for (let i = 0; i < 4; i++) later(i * 0.09, () => parts.push({ kind: 'wave', x: cx, y: cy, life: 1.1, max: 1.1, size: 1150, color: i % 2 ? '255,255,255' : rgb }));
     for (const a of u.allies) vbeam(a.x, 40, 0.5, rgb);
@@ -2770,6 +2772,7 @@ function makeShooter() {
     if (App.mode !== 'play' || scene || ending || ult || !ultReady || player.dead) return;
     initAudio();
     ultReady = false;
+    buzz([40, 40, 70]);
     const kind = P.ult || P.id;
     let mates = PLANES.filter(pl => pl.pilot.id !== P.pilot.id).map(pl => pl.look);
     if (kind === 'fleet' && camp.done.length) mates = camp.done.map(id => craftById(id).look);
