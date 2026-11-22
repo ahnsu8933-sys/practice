@@ -123,6 +123,11 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   #hangarList.compact .plane b { font-size: 11px; }
   .pinfo { gap: 1px; }
   .lead { font-size: 13px; line-height: 1.45; }
+  .card { padding: 8px 12px; gap: 10px; }
+  .card-body b { font-size: 17px; }
+  .card-body span { font-size: 12px; line-height: 1.3; }
+  #menuScr .lead, #ruleScr .lead, #menuScr .eyebrow { display: none; }
+  #menuScr .games, #ruleScr .games { gap: 6px; margin-top: 2px; }
 }
 .eyebrow { margin: 0; font-size: 13px; letter-spacing: 0.18em; color: var(--flare); }
 h1, h2 {
@@ -253,6 +258,16 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 .seg button + button { border-left: 1px solid var(--card-line); }
 .seg button[aria-checked="true"] { background: var(--flare); color: #2a1606; }
 #diffDesc { max-width: 32ch; min-height: 2.8em; line-height: 1.4; }
+.card[aria-pressed="true"] { border-color: var(--flare); background: rgba(255, 154, 74, 0.2); box-shadow: inset 0 0 0 1px var(--flare); }
+.card.locked { opacity: 0.6; }
+.card.locked .card-key { background: rgba(255,255,255,0.25); box-shadow: none; }
+.card .badge { align-self: flex-start; font: 11px var(--display); letter-spacing: 0.06em; color: #2a1606; background: #ffd966; border-radius: 6px; padding: 2px 7px; margin-bottom: 2px; }
+#modeList, #ruleList { max-width: 400px; }
+#menuScr .keys { grid-template-columns: repeat(4, auto); gap: 4px 12px; }
+@media (max-height: 900px) { #menuScr .lead { display: none; } }
+.linkbtn { background: none; border: 0; padding: 4px 6px; color: var(--muted); font: 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.linkbtn:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
+#storyCta { max-width: 32ch; color: #ffd3a8; }
 @media (prefers-reduced-motion: reduce) { .btn:active, .card:hover { transform: none; } .card { transition: none; } }
 </style>
 </head>
@@ -269,7 +284,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
     <div class="overlay" id="menuScr">
       <p class="eyebrow">고도 3,200m · 구름바다 상공</p>
       <h1>구름바다<br>요격전</h1>
-      <p class="lead">새벽 편대가 사라진 지 3년. 조종사 넷 중 하나를 골라, 무인 함대에 빼앗긴 여덟 기체를 격추하세요.</p>
+      <p class="lead">새벽 편대가 사라진 지 3년. 오늘은 얼마나 날아 볼까요?</p>
       <ul class="keys">
         <li><b>이동</b></li><li>방향키 · WASD · 화면 드래그</li>
         <li><b>사격</b></li><li>자동</li>
@@ -277,13 +292,16 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
         <li><b>편대 필살기</b></li><li>C 키 · 편대 버튼 (스테이지마다 1번)</li>
         <li><b>일시정지</b></li><li>P · Esc</li>
       </ul>
+      <div class="games" id="modeList">
+        <button class="card" id="mode0" type="button"><span class="card-key">1</span><span class="card-body"><span class="badge" id="freshBadge" hidden>처음이라면 여기부터</span><b>3분 출격</b><span>3분 동안 점수를 겨루는 스코어 어택이에요. 탄을 아슬아슬하게 스치면 점수가 붙어요.</span></span><span class="card-best">최고<strong id="bestAttack">0</strong></span></button>
+        <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 40스테이지, 엔딩 12개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/12</strong></span></button>
+        <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
+      </div>
       <div class="actions">
-        <button class="btn" id="startBtn" type="button">출격 준비</button>
         <button class="btn ghost" id="resumeRunBtn" type="button" hidden>이어서 출격</button>
-        <button class="btn ghost" id="endlessBtn" type="button" hidden>무한 모드</button>
       </div>
       <p class="small" id="runInfo" hidden></p>
-      <p class="small">최고 기록 <span id="best-shooter">0</span> · 엔딩 <span id="endCount">0</span>/12 · Enter로 시작</p>
+      <p class="small">↑↓ 고르기 · Enter 시작 · 스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="vibeMenuBtn" type="button" hidden>진동 켬</button></p>
     </div>
 
     <div class="overlay" id="pauseScr" hidden>
@@ -292,12 +310,13 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
         <button class="btn" id="resumeBtn" type="button">계속</button>
         <button class="btn ghost" id="pauseMenuBtn" type="button">처음 화면</button>
       </div>
+      <button class="linkbtn" id="vibeBtn" type="button" hidden>진동 켬</button>
       <p class="small">P 또는 Esc로도 돌아갈 수 있어요</p>
     </div>
 
 
     <div class="overlay" id="setupScr" hidden>
-      <p class="eyebrow">구름바다 요격전</p>
+      <p class="eyebrow" id="setupEyebrow">구름바다 요격전</p>
       <h2>출격 준비</h2>
       <p class="section-label">조종사</p>
       <div class="planes" id="planeList"></div>
@@ -326,6 +345,15 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
       <p class="small" id="hangarKeys">1~3 기체 · Enter 출격</p>
     </div>
 
+    <div class="overlay" id="ruleScr" hidden>
+      <p class="eyebrow" id="ruleEyebrow">무한 모드</p>
+      <h2>변이 규칙</h2>
+      <p class="lead">하나를 골라 하늘에 더하세요. 규칙이 하나 늘 때마다 점수 배율이 0.3씩 올라요.</p>
+      <div class="games" id="ruleList"></div>
+      <p class="small" id="ruleNow"></p>
+      <p class="small">1~3 선택</p>
+    </div>
+
     <div class="overlay" id="contScr" hidden>
       <p class="eyebrow">격추됨</p>
       <h2>이어서 할까요?</h2>
@@ -341,8 +369,10 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
       <p class="eyebrow" id="overEyebrow">격추됨</p>
       <h2 id="overTitle">임무 종료</h2>
       <div class="stats" id="overStats"></div>
+      <p class="small" id="storyCta" hidden>새벽 편대의 이야기는 본편에서 이어집니다.</p>
       <div class="actions">
         <button class="btn" id="retryBtn" type="button">다시 하기</button>
+        <button class="btn ghost" id="storyCtaBtn" type="button" hidden>스토리 모드로</button>
         <button class="btn ghost" id="overMenuBtn" type="button">처음 화면</button>
       </div>
       <p class="small">Enter 다시 하기 · Esc 처음 화면</p>
@@ -370,7 +400,7 @@ const Save = (() => {
   const KEY = 'cloudsea-save', VERSION = 1;
   const PIDS = ['swallow', 'hawk', 'ox', 'owl'], DIDS = ['easy', 'normal', 'hard'];
   const recKey = (p, d) => PIDS[p] + '-' + DIDS[d];
-  const blank = () => ({ v: VERSION, best: {}, clears: {}, endings: {}, endless: {}, run: null, settings: { plane: 1, diff: 1, music: true, sound: true } });
+  const blank = () => ({ v: VERSION, best: {}, clears: {}, endings: {}, endless: {}, attack: {}, run: null, settings: { plane: 1, diff: 1, music: true, sound: true, vibe: true } });
   const read = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   let d = blank();
   try {
@@ -416,6 +446,15 @@ const Save = (() => {
     get run() { return d.run; },
     setRun(r) { d.run = r; write(); },
     clearRun() { if (d.run) { d.run = null; write(); } },
+    fresh: () => d.settings.mode === undefined && !d.run && !Object.keys(d.best).length && !Object.keys(d.attack).length && !Object.keys(d.endings).length,
+    attackBest: (p, df) => d.attack[recKey(p, df)] || 0,
+    attackTop: () => Object.values(d.attack).reduce((m, v) => Math.max(m, v), 0),
+    attackRecord(p, df, score) {
+      const k = recKey(p, df), b = d.attack[k] || 0, res = { all: score > b, nc: false };
+      if (res.all) { d.attack[k] = score; write(); }
+      return res;
+    },
+    endlessTop: () => Object.values(d.endless).reduce((m, b) => Math.max(m, b.all), 0),
     endlessBest: (planeId, df) => d.endless[planeId + '-' + DIDS[df]] || { all: 0, nc: 0 },
     endlessRecord(planeId, df, score, nc) {
       const k = planeId + '-' + DIDS[df], b = d.endless[k] || { all: 0, nc: 0 };
@@ -445,6 +484,10 @@ fit();
 
 /* ================= audio ================= */
 let actx = null, muted = false;
+/* feel: vibration (Android web; iOS Safari has no vibration API), hit-stop, red border when hit */
+const canVibe = typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+function buzz(pattern) { if (!canVibe || !Save.settings.vibe) return; try { navigator.vibrate(pattern); } catch (e) {} }
+let hitStop = 0, hurtFx = 0;
 muted = !Save.settings.sound;
 function initAudio() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
@@ -1302,6 +1345,52 @@ function drawEnemy(e) {
       ctx.fillStyle = '#ffb347'; ctx.fillRect(-26, -46, 52 * Math.max(0, e.hp / e.maxHp), 4);
     }
 
+  } else if (e.type === 'shield') {
+    ctx.fillStyle = col('#3a4566');
+    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(16, -6); ctx.lineTo(12, 10); ctx.lineTo(-12, 10); ctx.lineTo(-16, -6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = col('#56628c'); rr(-23, -5, 46, 8, 3); ctx.fill();
+    ctx.fillStyle = `rgba(255,77,109,${blink})`; ctx.beginPath(); ctx.arc(0, -3, 4, 0, TAU); ctx.fill();
+    if (e.shield > 0) {
+      const k = e.shield / e.maxShield;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(120,210,255,0.22)'; ctx.lineWidth = 12;
+      ctx.beginPath(); ctx.arc(0, -4, 27, 0.3 * Math.PI, 0.7 * Math.PI); ctx.stroke();
+      ctx.strokeStyle = e.sflash > 0 ? '#ffffff' : `rgba(140,220,255,${0.45 + 0.5 * k})`; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(0, -4, 27, 0.3 * Math.PI, 0.7 * Math.PI); ctx.stroke();
+    }
+  } else if (e.type === 'kamikaze') {
+    ctx.rotate((e.ang || Math.PI / 2) - Math.PI / 2);
+    ctx.fillStyle = col('#6a2333');
+    ctx.beginPath(); ctx.moveTo(0, 18); ctx.lineTo(-9, -3); ctx.lineTo(-16, -14); ctx.lineTo(0, -8); ctx.lineTo(16, -14); ctx.lineTo(9, -3); ctx.closePath(); ctx.fill();
+    const hot = e.phase >= 1 ? 0.5 + 0.5 * Math.sin(time * 40) : blink * 0.6;
+    glowDot(0, 2, 16, '255,90,60', 0.55 * hot);
+    ctx.fillStyle = `rgba(255,${e.phase >= 1 ? 230 : 90},90,${0.6 + 0.4 * hot})`; ctx.beginPath(); ctx.arc(0, 2, 4.5, 0, TAU); ctx.fill();
+    if (e.phase === 2) { ctx.fillStyle = 'rgba(255,150,80,0.7)'; ctx.beginPath(); ctx.moveTo(-5, -9); ctx.lineTo(0, -26 - Math.random() * 8); ctx.lineTo(5, -9); ctx.fill(); }
+  } else if (e.type === 'splitter') {
+    ctx.rotate(Math.sin(e.t * 2) * 0.2);
+    ctx.fillStyle = col('#4b2f6e');
+    ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(20, 0); ctx.lineTo(0, 22); ctx.lineTo(-20, 0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(215,175,255,0.75)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, -22); ctx.lineTo(0, 22); ctx.moveTo(-20, 0); ctx.lineTo(20, 0); ctx.stroke();
+    ctx.fillStyle = `rgba(210,130,255,${blink})`; ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fill();
+  } else if (e.type === 'shard') {
+    ctx.rotate(e.t * 8);
+    ctx.fillStyle = col('#7a52a8');
+    ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(9, 7); ctx.lineTo(-9, 7); ctx.closePath(); ctx.fill();
+  } else if (e.type === 'sniper') {
+    ctx.fillStyle = col('#2c3550'); rr(-4, -20, 8, 38, 3); ctx.fill();
+    ctx.fillStyle = col('#3d4a70');
+    ctx.beginPath(); ctx.moveTo(-22, -8); ctx.lineTo(22, -8); ctx.lineTo(5, 3); ctx.lineTo(-5, 3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#161b2e'; ctx.fillRect(-1.5, 14, 3, 14);
+    ctx.fillStyle = `rgba(255,60,70,${e.mode === 'lock' ? 1 : blink})`; ctx.beginPath(); ctx.arc(0, 6, 3.5, 0, TAU); ctx.fill();
+  } else if (e.type === 'mine') {
+    ctx.rotate(e.t * 1.5);
+    ctx.fillStyle = col('#3d3f55');
+    for (let i = 0; i < 8; i++) { ctx.save(); ctx.rotate(i * TAU / 8); ctx.fillRect(-2.5, -18, 5, 8); ctx.restore(); }
+    ctx.beginPath(); ctx.arc(0, 0, 12, 0, TAU); ctx.fill();
+    const a = e.arm ? 0.5 + 0.5 * Math.sin(time * 45) : blink * 0.7;
+    glowDot(0, 0, 14, '255,80,80', 0.4 * a);
+    ctx.fillStyle = `rgba(255,90,90,${0.5 + 0.5 * a})`; ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, TAU); ctx.fill();
   } else if (e.type === 'factory') {
     drawFactory(e, col, blink, hurt);
   } else if (e.type === 'beacon' || e.type === 'cloud') {
@@ -1959,24 +2048,60 @@ function makeShooter() {
     diver:  { hp: 3,  r: 13, score: 150, drop: 0.1 },
     gunner: { hp: 8,  r: 18, score: 280, drop: 0.32 },
     heavy:  { hp: 24, r: 30, score: 650, drop: 0.7 },
+    // endless-mode foes (one row each; waves below pick from them)
+    shield:   { hp: 9,  r: 18, score: 420, drop: 0.3,  shield: 14, name: '방패병' },
+    kamikaze: { hp: 3,  r: 13, score: 260, drop: 0.12, name: '자폭기' },
+    splitter: { hp: 9,  r: 20, score: 360, drop: 0.25, name: '분열기' },
+    shard:    { hp: 2,  r: 10, score: 60,  drop: 0 },
+    sniper:   { hp: 6,  r: 15, score: 460, drop: 0.3,  name: '저격기' },
+    mine:     { hp: 5,  r: 14, score: 220, drop: 0.1,  name: '기뢰' },
   };
+  // endless waves as data: [from stage, weight, foe, count, formation]
+  const FOE_WAVES = [
+    [41, 3, 'shield', 2, 'pair'], [41, 3, 'mine', 4, 'scatter'], [43, 3, 'kamikaze', 3, 'line'],
+    [45, 3, 'splitter', 2, 'pair'], [47, 2, 'sniper', 2, 'corners'], [50, 2, 'shield', 3, 'line'],
+    [52, 2, 'kamikaze', 5, 'arc'], [54, 2, 'mine', 6, 'scatter'], [56, 1, 'sniper', 3, 'line'],
+  ];
+  const FORMS = {
+    pair: i => ({ x: W / 2 + (i ? 110 : -110), y: -40 }),
+    line: (i, n) => ({ x: 80 + i * (W - 160) / Math.max(1, n - 1), y: -40 - i * 12 }),
+    scatter: () => ({ x: rand(50, W - 50), y: rand(-170, -30) }),
+    corners: i => ({ x: i % 2 ? W - 70 : 70, y: -40 - i * 30 }),
+    arc: (i, n) => ({ x: W / 2 + (i - (n - 1) / 2) * 70, y: -40 - Math.abs(i - (n - 1) / 2) * 30 }),
+  };
+  // endless mutation rules, one more every 5 stages; each adds 0.3 to the score multiplier
+  const RULES = {
+    storm: { name: '뇌우', desc: '먹구름이 시야를 가리고, 가끔 번개가 내려쳐요.' },
+    wind:  { name: '역풍', desc: '옆바람이 불어 적 탄이 휘어져요.' },
+    night: { name: '야간 비행', desc: '내 주변만 보여요. 적 탄과 아이템은 빛나요.' },
+    fast:  { name: '탄속 증가', desc: '적 탄이 25% 빨라져요.' },
+    swarm: { name: '증원 편대', desc: '적 편대가 더 자주 몰려와요.' },
+    armor: { name: '철갑', desc: '적 내구가 30% 늘어요. 보스는 15%.' },
+  };
+  const COMBO = ['whale', 'nest', 'beacon', 'cloud', 'boss', 'ace'];
+  const ATTACK_TIME = 180, GRAZE_R = 16;
   const ENTER = { factory: [150, 45], beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
   let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow;
+  let bossDuo, attackT, attackEnd, grazes, grazeSfx, survBonus, ruleWind, stormT, clouds;
+  const hasRule = id => !!(camp && camp.rules && camp.rules.includes(id));
+  const grazeOn = () => !!(camp && (camp.attack || camp.act === 4));
+  const scoreMul = () => (camp && camp.act === 4 && camp.rules ? 1 + 0.3 * camp.rules.length : 1);
+  const stageLen = () => (camp && camp.attack ? 28 : STAGE_LEN);
   const grow = () => {
     const g = stageNo - 1;
     if (!camp || camp.act === 1) return Math.min(g, 16);
     if (camp.act === 2 || camp.act === 3) return 7 + (stageNo - 9) * 0.2;   // stage 9 = stage 8, stage 40 ~ stage 14
-    return Math.min(40, 13.4 + (stageNo - 41) * 0.25);
+    return Math.min(20, 13.4 + (stageNo - 41) * 0.55);   // endless: reaches its cap at stage 53, then rules pile up instead
   };
-  const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet;
+  const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet * (hasRule('fast') ? 1.25 : 1);
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
   const turretsLeft = () => enemies.some(o => o.type === 'turret' && !o.dead);
   const later = (delay, fn) => timers.push({ t: delay, fn });
-  const storyOn = () => camp.act === 1;
-  const bossLabel = () => (bossShadow ? '그림자 ' : '') + BOSS_INFO[bossKind].title + ' ' + BOSS_INFO[bossKind].name;
+  const storyOn = () => camp.act === 1 && !camp.attack;
+  const bossLabel = () => bossDuo ? BOSS_INFO[bossKind].name + ' + 그림자 ' + BOSS_INFO[bossDuo].name + ' 연합' : (bossShadow ? '그림자 ' : '') + BOSS_INFO[bossKind].title + ' ' + BOSS_INFO[bossKind].name;
   function addScore(n, x, y) {
-    const v = Math.round(n * D.score);
+    const v = Math.round(n * D.score * scoreMul());
     score += v;
     if (x !== undefined) floatText(x, y, '+' + fmt(v));
   }
@@ -2006,7 +2131,8 @@ function makeShooter() {
     stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false; ultReady = true;
     setSky(stageNo - 1);
     const sub = camp.act === 2 ? `회수 작전 ${camp.chapter}/${CRAFTS.length} · ${craftById(camp.craft).name} · ${camp.chStage + 1}/4 구간`
-      : camp.act === 3 ? `마지막 출격 · ${camp.chStage + 1}/4 구간` : camp.act === 4 ? '무한 모드 · ' + P.name : sky.name + ' 하늘';
+      : camp.act === 3 ? `마지막 출격 · ${camp.chStage + 1}/4 구간` : camp.act === 4 ? '무한 모드 · ' + P.name + (camp.rules && camp.rules.length ? ' · 점수 ×' + scoreMul().toFixed(1) : '')
+      : camp.attack ? '3분 출격 · ' + sky.name + ' 하늘' : sky.name + ' 하늘';
     showBanner('STAGE ' + stageNo, sub, 2.4);
     if (stageNo === 1) for (const t of [10, 25]) later(t, () => {
       if (player.dead || player.power >= 5) return;
@@ -2025,10 +2151,87 @@ function makeShooter() {
   }
   function addEnemy(type, o) {
     const b = ETYPES[type];
-    const hp = Math.ceil(b.hp * Math.max(1.3 + 0.1 * grow(), 1.55 + 0.05 * grow()) * D.ehp);
-    enemies.push(Object.assign({ type, t: 0, hp, maxHp: hp, r: b.r, score: b.score, drop: b.drop, flash: 0, fireT: rand(0.9, 1.8), phase: 0, vx: 0, vy: 0, ang: Math.PI / 2 }, o));
+    const k = Math.max(1.3 + 0.1 * grow(), 1.55 + 0.05 * grow()) * D.ehp * (hasRule('armor') ? 1.3 : 1);
+    const hp = Math.ceil(b.hp * k);
+    const e = Object.assign({ type, t: 0, hp, maxHp: hp, r: b.r, score: b.score, drop: b.drop, flash: 0, fireT: rand(0.9, 1.8), phase: 0, vx: 0, vy: 0, ang: Math.PI / 2 }, o);
+    if (b.shield) { e.shield = e.maxShield = Math.ceil(b.shield * k); e.sflash = 0; }
+    enemies.push(e);
+    return e;
+  }
+  function spawnFoes() {
+    const rows = FOE_WAVES.filter(r => stageNo >= r[0]);
+    let w = Math.random() * rows.reduce((a, r) => a + r[1], 0), row = rows[0];
+    for (const r of rows) { w -= r[1]; if (w <= 0) { row = r; break; } }
+    const [, , type, n, form] = row;
+    for (let i = 0; i < n; i++) {
+      const pos = FORMS[form](i, n);
+      addEnemy(type, Object.assign(pos, { x0: pos.x, ty: rand(120, 250), fireT: rand(1, 2) }));
+    }
+    camp.seenFoes = camp.seenFoes || [];
+    if (!camp.seenFoes.includes(type)) { camp.seenFoes.push(type); floatText(W / 2, 180, '새 적 출현 · ' + ETYPES[type].name, '255,190,200'); }
+  }
+  function blast(e, n, sp) {
+    ring(e.x, e.y, n, sp, rand(0, 1), 5, 1);
+    explode(e.x, e.y, 1.1);
+    parts.push({ kind: 'ring', x: e.x, y: e.y, life: 0.35, max: 0.35, size: 70, color: '255,120,90' });
+    boom(0.35, 0.12, 900);
+  }
+  function updateFoe(e, dt, fr) {
+    const p = player;
+    if (e.type === 'shield') {
+      e.sflash = Math.max(0, e.sflash - dt);
+      if (e.phase === 0) { e.y += (e.ty - e.y) * Math.min(1, dt * 1.8) + 15 * dt; if (e.y >= e.ty - 4) { e.phase = 1; e.t = 0; } }
+      else if (e.phase === 1) {
+        e.x = clamp(e.x0 + Math.sin(e.t * 0.9) * 40, 30, W - 30);
+        e.fireT -= fr; if (e.fireT <= 0) { shootAt(e.x, e.y + 14, 190, 2, 0.16); e.fireT = 1.8; }
+        if (e.t > 8) e.phase = 2;
+      } else { e.y += 70 * dt; if (e.y > H + 40) e.gone = true; }
+    } else if (e.type === 'kamikaze') {
+      if (e.phase === 0) { e.y += 230 * dt; if (e.y >= e.ty) { e.phase = 1; e.t = 0; tone(700, 0.5, 'square', 0.02, 1500); } }
+      else if (e.phase === 1) {
+        e.ang = Math.atan2(p.y - e.y, p.x - e.x);
+        if (e.t > 0.6) { e.phase = 2; e.t = 0; e.sp = 160; }
+      } else {
+        let da = Math.atan2(p.y - e.y, p.x - e.x) - e.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+        e.ang += clamp(da, -1.6 * dt, 1.6 * dt);
+        e.sp = Math.min(480, e.sp + 520 * dt) * 1;
+        e.x += Math.cos(e.ang) * e.sp * bspd() * dt; e.y += Math.sin(e.ang) * e.sp * bspd() * dt;
+        if ((!p.dead && Math.hypot(p.x - e.x, p.y - e.y) < 64) || e.t > 2.4) { e.gone = true; blast(e, 10, 150); }
+      }
+      if (e.y > H + 40 || e.x < -40 || e.x > W + 40) e.gone = true;
+    } else if (e.type === 'splitter') {
+      e.y += 62 * dt; e.x = clamp(e.x0 + Math.sin(e.t * 1.1) * 50, 30, W - 30);
+      e.fireT -= fr; if (e.fireT <= 0 && e.y > 30) { ring(e.x, e.y, 6, 120, e.t, 5, 2); e.fireT = 2.6; }
+      if (e.y > H + 40) e.gone = true;
+    } else if (e.type === 'shard') {
+      e.x += e.vx * dt; e.y += e.vy * dt; e.vy += 120 * dt;
+      if (e.y > H + 30 || e.x < -30 || e.x > W + 30) e.gone = true;
+    } else if (e.type === 'sniper') {
+      if (!e.mode) { e.mode = 'in'; e.shots = 3; e.aimA = Math.PI / 2; e.ty = rand(70, 120); }
+      if (e.mode === 'in') { e.y += (e.ty - e.y) * Math.min(1, dt * 3) + 10 * dt; if (e.y >= e.ty - 3) { e.mode = 'aim'; e.mt2 = 1.2; } }
+      else if (e.mode === 'aim') {
+        let da = Math.atan2(p.y - e.y, p.x - e.x) - e.aimA; da = Math.atan2(Math.sin(da), Math.cos(da));
+        e.aimA += clamp(da, -2.4 * dt, 2.4 * dt);
+        e.mt2 -= fr;
+        if (e.mt2 <= 0) { e.mode = 'lock'; e.mt2 = 0.4; tone(1500, 0.3, 'sine', 0.02, 1500); }
+      } else if (e.mode === 'lock') {
+        e.mt2 -= dt;
+        if (e.mt2 <= 0) {
+          const sp = 520 * bspd(), c = Math.cos(e.aimA), si = Math.sin(e.aimA);
+          eb.push({ x: e.x + c * 18, y: e.y + si * 18, vx: c * sp, vy: si * sp, r: 5, color: 0 });
+          tone(900, 0.08, 'square', 0.03, 300);
+          e.shots--; e.mode = e.shots > 0 ? 'aim' : 'out'; e.mt2 = 1;
+        }
+      } else { e.y -= 90 * dt; if (e.y < -40) e.gone = true; }
+    } else if (e.type === 'mine') {
+      e.y += 45 * dt; e.x = clamp(e.x0 + Math.sin(e.t * 0.8) * 25, 20, W - 20);
+      if (!e.arm && !p.dead && Math.hypot(p.x - e.x, p.y - e.y) < 82) { e.arm = 0.7; tone(1100, 0.12, 'square', 0.03, 1100); }
+      if (e.arm) { e.arm -= dt; if (e.arm <= 0) { e.gone = true; blast(e, 12, 130); } }
+      if (e.y > H + 40) e.gone = true;
+    }
   }
   function spawnWave() {
+    if (camp.act === 4 && Math.random() < 0.4) { spawnFoes(); return; }
     const s = stageNo, r = Math.random();
     // stages 2-7: the player is already powered up, so add a small escort squad to some waves
     const extra = grow() >= 1 && grow() <= 6 ? 0.75 : 0;
@@ -2054,14 +2257,28 @@ function makeShooter() {
   function spawnBoss() {
     bossSpawned = true;
     bossItemT = 6; escortT = 1; heavyT = 6;
-    const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow;
-    const m = (1 + 0.08 * grow()) * D.ehp;
+    const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null;
+    const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1);
+    // endless: every third stage from 43, two bosses at once (the second one a shadow)
+    if (camp.act === 4 && stageNo >= 43 && (stageNo - 41) % 3 === 2) {
+      const a = COMBO.includes(bossKind) ? bossKind : COMBO[Math.floor(Math.random() * COMBO.length)];
+      const rest = COMBO.filter(k => k !== a);
+      bossKind = a; bossDuo = rest[Math.floor(Math.random() * rest.length)];
+      buildBoss(a, m * 0.62, -1, false); buildBoss(bossDuo, m * 0.62, 1, true);
+    } else buildBoss(bossKind, m, 0, bossShadow);
+    showBanner('WARNING', bossLabel() + ' 접근 중', 2.8, true);
+    shake = Math.max(shake, 0.35);
+    tone(220, 0.35, 'sawtooth', 0.05, 440); later(0.45, () => tone(220, 0.35, 'sawtooth', 0.05, 440)); later(0.9, () => tone(220, 0.5, 'sawtooth', 0.05, 110));
+  }
+  function buildBoss(kind, m, side, shadow) {
     const mk = (type, hp, o) => {
       hp = Math.round(hp * m);
-      const e = Object.assign({ type, t: 0, mt: 0, flash: 0, isBoss: true, dead: false, shadow: bossShadow, hp, maxHp: hp, fireT: 1.6, fire2: 1.5, spin: 0, arrived: false }, o);
+      const e = Object.assign({ type, t: 0, mt: 0, flash: 0, isBoss: true, dead: false, shadow, hp, maxHp: hp, fireT: 1.6, fire2: 1.5, spin: 0, arrived: false }, o);
+      if (side) { e.duo = side; e.x += side * 115; }
       enemies.push(e);
       return e;
     };
+    const bossKind = kind;
     if (bossKind === 'whale') {
       mk('whale', 800, { x: W / 2, y: -80, hw: 105, hh: 32, r: 40, ringT: 3, burst: 0, burstT: 0, dcT: 2, score: 4000 });
     } else if (bossKind === 'twin') {
@@ -2084,9 +2301,6 @@ function makeShooter() {
         mk('turret', 85, { parent: core, ox, oy, x: core.x + ox, y: core.y + oy, r: 17, fireT: 1.4 + i * 0.35, aim: Math.PI / 2, score: 800 });
       });
     }
-    showBanner('WARNING', bossLabel() + ' 접근 중', 2.8, true);
-    shake = Math.max(shake, 0.35);
-    tone(220, 0.35, 'sawtooth', 0.05, 440); later(0.45, () => tone(220, 0.35, 'sawtooth', 0.05, 440)); later(0.9, () => tone(220, 0.5, 'sawtooth', 0.05, 110));
   }
   function onArrive(e) {
     e.arrived = true;
@@ -2357,6 +2571,7 @@ function makeShooter() {
     if (App.mode !== 'play' || scene || ending || player.bombs <= 0 || player.dead) return;
     initAudio();
     player.bombs--;
+    buzz(45);
     let coins = 0;
     for (const b of eb) { spark(b.x, b.y, '255,220,140', 3, 90); coins++; }
     eb = [];
@@ -3031,12 +3246,25 @@ function makeShooter() {
     return { kind: others[(camp.chapter * 3 + camp.chStage) % others.length], shadow: true };
   }
   function saveRun() {
+    if (camp.attack) return;
     Save.setRun({ plane: camp.orig, diff: DIFFS.indexOf(D), stage: stageNo, score, kills, continues,
-      hp: player.hp, maxHp: player.maxHp, power: player.power, bombs: player.bombs, camp: JSON.parse(JSON.stringify(camp)) });
+      hp: player.hp, maxHp: player.maxHp, power: player.power, bombs: player.bombs, grazes, camp: JSON.parse(JSON.stringify(camp)) });
   }
   function nextStage() {
     stageNo++;
     if (camp.act === 2 || camp.act === 3) camp.chStage++;
+    if (camp.act === 4) camp.rules = camp.rules || [];
+    const left = Object.keys(RULES).filter(k => !(camp.rules || []).includes(k));
+    if (camp.act === 4 && stageNo > 41 && (stageNo - 41) % 5 === 0 && left.length) {
+      const pick = left.sort(() => Math.random() - 0.5).slice(0, 3);
+      App.openRules(pick.map(id => Object.assign({ id }, RULES[id])), stageNo, camp.rules.map(id => RULES[id].name), scoreMul() + 0.3, id => {
+        camp.rules.push(id);
+        startStage();
+        saveRun();
+        later(2.6, () => floatText(W / 2, 160, '변이 규칙 · ' + RULES[id].name + ' · 점수 ×' + scoreMul().toFixed(1), '255,210,160'));
+      });
+      return;
+    }
     startStage();
     saveRun();
   }
@@ -3175,7 +3403,7 @@ function makeShooter() {
     App.openHangar(endlessChoices(), 0, 0, pickEndless, { endless: true });
   }
   function pickEndless(ch) {
-    camp.act = 4; camp.chStage = -1;
+    camp.act = 4; camp.chStage = -1; camp.rules = [];
     if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
     else { camp.craft = null; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
     player.power = Math.max(player.power, 3); player.bombs = Math.max(player.bombs, D.bombs);
@@ -3241,9 +3469,20 @@ function makeShooter() {
     });
   }
 
-  function hitEnemy(e, dmg) {
+  function hitEnemy(e, dmg, flank) {
     if (e.dead) return;
     if (e.armored && turretsLeft()) { e.flash = 0.03; return; }
+    if (e.shield > 0 && !flank) {
+      const a = Math.min(e.shield, dmg);
+      e.shield -= a; dmg -= a; e.sflash = 0.07;
+      if (e.shield <= 0) {
+        spark(e.x, e.y + 16, '150,220,255', 14, 200);
+        parts.push({ kind: 'ring', x: e.x, y: e.y + 8, life: 0.3, max: 0.3, size: 50, color: '150,220,255' });
+        tone(1300, 0.15, 'triangle', 0.04, 500);
+        floatText(e.x, e.y - 24, '방패 파괴', '170,225,255');
+      }
+      if (dmg <= 0) return;
+    }
     if (e.isBoss && !(e.type === 'turret' ? e.parent.arrived : e.arrived)) dmg *= 0.25;
     e.hp -= dmg; e.flash = 0.07;
     if (e.hp <= 0) killEnemy(e);
@@ -3251,6 +3490,7 @@ function makeShooter() {
   function killEnemy(e) {
     e.dead = true; kills++;
     if (e.isBoss) {
+      if (e.type === 'turret') { hitStop = Math.max(hitStop, 0.05); buzz(30); }
       addScore(e.score * stageNo, e.x, e.y - 10);
       explode(e.x, e.y, e.type === 'turret' ? 1.4 : 2.6);
       if (e.type === 'turret' && !turretsLeft()) {
@@ -3268,7 +3508,11 @@ function makeShooter() {
       return;
     }
     addScore(e.score, e.x, e.y - 10);
-    explode(e.x, e.y, e.type === 'heavy' ? 1.8 : e.type === 'gunner' ? 1.2 : 0.8);
+    explode(e.x, e.y, e.type === 'heavy' ? 1.8 : e.type === 'gunner' || e.type === 'shield' || e.type === 'splitter' ? 1.2 : 0.8);
+    if (e.type === 'heavy') { hitStop = Math.max(hitStop, 0.07); buzz(35); }
+    else if (e.type === 'shield' || e.type === 'splitter' || e.type === 'sniper') { hitStop = Math.max(hitStop, 0.035); buzz(20); }
+    if (e.type === 'splitter') for (const vx of [-130, 0, 130]) addEnemy('shard', { x: e.x, y: e.y, vx, vy: 150, minion: true });
+    if (e.type === 'mine') blast(e, 8, 110);
     if (Math.random() < e.drop * (camp.act === 3 ? 2.5 : 1)) {
       const r = Math.random();
       let kind;
@@ -3280,6 +3524,7 @@ function makeShooter() {
     }
   }
   function stageClear(e) {
+    hitStop = Math.max(hitStop, 0.16); buzz([60, 40, 140]);
     if (e.type === 'factory') { startFinale(e); return; }
     for (let i = 0; i < 12; i++) later(i * 0.12, () => explode(e.x + rand(-80, 80), e.y + rand(-40, 40), 1.7));
     later(1.2, () => { explode(e.x, e.y, 3.4); flashColor = '255,255,255'; flashT = 0.5; parts.push({ kind: 'wave', x: e.x, y: e.y, life: 1, max: 1, size: 900, color: '255,230,200' }); });
@@ -3302,7 +3547,7 @@ function makeShooter() {
       showBanner('STAGE CLEAR', bossLabel() + ' 격파 · 보너스 +' + fmt(2000 * stageNo * D.score), 2.8);
       fanfare();
     };
-    if (camp.act === 1) {
+    if (camp.act === 1 && !camp.attack) {
       const last = stageNo === BOSS_ORDER.length;
       const info = BOSS_INFO[bossKind], L = PILOT_LINES[P.pilot.id];
       const lines = [bossLine(info.last, info.lastName), pilotLine(L[bossKind][1])];
@@ -3330,6 +3575,7 @@ function makeShooter() {
     player.inv = 2;
     player.power = Math.max(1, player.power - 1);
     shake = Math.max(shake, 0.45);
+    hurtFx = 0.6; buzz(player.hp <= 0 ? [120, 60, 240] : 90);
     explode(player.x, player.y, 0.7);
     tone(180, 0.3, 'sawtooth', 0.06, 60);
     for (let i = eb.length - 1; i >= 0; i--) if (Math.hypot(eb[i].x - player.x, eb[i].y - player.y) < 110) eb.splice(i, 1);
@@ -3575,8 +3821,11 @@ function makeShooter() {
         e.fireT -= fr;
         if (e.fireT <= 0 && e.y > 30) { ring(e.x, e.y, Math.max(13, 10 + Math.min(8, grow())), 130, e.t); e.fireT = Math.max(1.6, 2.4 - 0.06 * grow()); }
         if (e.y > H + 60) e.gone = true;
+      } else if (!e.isBoss) {
+        updateFoe(e, dt, fr);
       } else {
         updateBoss(e, dt);
+        if (e.duo && e.arrived && e.type !== 'ace' && e.type !== 'turret') e.x = W / 2 + (e.x - W / 2) * 0.4 + e.duo * 115;
         if (scene) return;
       }
     }
@@ -3588,8 +3837,10 @@ function makeShooter() {
       for (const e of enemies) {
         if (e.dead || (b.hits && b.hits.has(e))) continue;
         if (hits(e, b.x, b.y, b.style === 'shell' ? 7 : 4)) {
-          hitEnemy(e, b.dmg);
-          const blocked = e.armored && turretsLeft();
+          const flank = e.shield > 0 && (b.y < e.y - 2 || Math.abs(b.x - e.x) > 12);
+          const shielded = e.shield > 0 && !flank;
+          hitEnemy(e, b.dmg, flank);
+          const blocked = (e.armored && turretsLeft()) || shielded;
           spark(b.x, b.y, blocked ? '160,200,255' : '255,240,200', b.style === 'shell' ? 5 : 2, 120);
           if (b.splash && !blocked) {
             parts.push({ kind: 'ring', x: b.x, y: b.y, life: 0.25, max: 0.25, size: b.splash, color: '255,190,120' });
@@ -3623,8 +3874,11 @@ function makeShooter() {
     }
     enemies = enemies.filter(e => !e.dead && !e.gone);
 
+    ruleWind = 0;
+    if (hasRule('wind')) { const g = Math.sin(time * 0.4); ruleWind = Math.abs(g) < 0.3 ? 0 : Math.sign(g) * (Math.abs(g) - 0.3) / 0.7 * 90; if (!windNow) windNow = ruleWind; }
     for (const b of eb) {
       if (freezeT > 0) continue;
+      if (ruleWind) b.vx += ruleWind * 1.3 * dt;
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.fuse !== undefined) {
         b.fuse -= dt;
@@ -3637,7 +3891,20 @@ function makeShooter() {
       pb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 600, vy: Math.min(-200, Math.sin(a) * 600), dmg: 2 * P.dmg, ang: 0, style: 'orb' });
     }
     if (!p.dead) {
-      for (const b of eb) if (!b.hit && Math.hypot(b.x - p.x, b.y - p.y) < b.r + P.hit) { b.hit = true; hurtPlayer(); break; }
+      const gz = grazeOn() && p.inv <= 0 && !scene;
+      for (const b of eb) {
+        if (b.hit) continue;
+        const d = Math.hypot(b.x - p.x, b.y - p.y);
+        if (d < b.r + P.hit) { b.hit = true; hurtPlayer(); break; }
+        if (gz && !b.grazed && d < b.r + P.hit + GRAZE_R) {
+          // graze: slipping past a bullet by a hair scores
+          b.grazed = true; grazes++;
+          score += Math.round(40 * D.score * scoreMul() * (camp.attack ? 1 + 0.15 * (stageNo - 1) : 1));
+          parts.push({ kind: 'spark', x: (b.x + p.x) / 2, y: (b.y + p.y) / 2, vx: rand(-60, 60), vy: rand(-60, 60), life: 0.25, max: 0.25, size: 3, color: '200,240,255' });
+          if (grazeSfx <= 0) { tone(1900, 0.035, 'triangle', 0.014, 2300); grazeSfx = 0.06; }
+          if (grazes % 25 === 0) floatText(p.x, p.y - 44, '스치기 ' + grazes, '200,240,255');
+        }
+      }
     }
     eb = eb.filter(b => !b.hit && b.x > -20 && b.x < W + 20 && b.y > -20 && b.y < H + 20);
 
@@ -3651,6 +3918,48 @@ function makeShooter() {
       }
     }
     beams = beams.filter(b => b.warn > 0 || b.live > 0);
+    if (grazeSfx > 0) grazeSfx -= dt;
+  }
+  /* storm rule: dark clouds drift across the screen and lightning strikes now and then */
+  function updateRules(dt) {
+    if (!hasRule('storm')) return;
+    if (!clouds) clouds = [0, 1, 2].map(i => ({ x: rand(0, W), y: 200 + i * 130 + rand(-30, 30), w: rand(110, 160), sp: rand(18, 34) * (i % 2 ? -1 : 1) }));
+    for (const c of clouds) { c.x += c.sp * dt; if (c.x > W + c.w) c.x = -c.w; if (c.x < -c.w) c.x = W + c.w; }
+    stormT -= dt;
+    if (stormT <= 0) {
+      stormT = rand(5, 7.5);
+      const x = rand(40, W - 40);
+      beams.push({ x, y0: 0, w: 30, warn: 1, live: 0.25, rgb: '200,210,255' });
+      later(1, () => { flashColor = '220,225,255'; flashT = 0.18; });
+      tone(1200, 0.9, 'sine', 0.02, 300);
+    }
+  }
+  function drawClouds() {
+    for (const c of clouds || []) {
+      ctx.fillStyle = 'rgba(38,40,64,0.9)';
+      ctx.beginPath();
+      for (let k = 0; k < 5; k++) ctx.ellipse(c.x - c.w * 0.6 + k * c.w * 0.3, c.y + Math.sin(k * 2.1) * 10, c.w * 0.32, 34 + (k % 2) * 10, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(90,96,140,0.35)';
+      ctx.beginPath(); ctx.ellipse(c.x, c.y - 18, c.w * 0.7, 16, 0, 0, TAU); ctx.fill();
+    }
+  }
+  function drawNight() {
+    const p = player, g = ctx.createRadialGradient(p.x, p.y, 80, p.x, p.y, 240);
+    g.addColorStop(0, 'rgba(4,6,22,0)'); g.addColorStop(1, 'rgba(4,6,22,0.88)');
+    ctx.fillStyle = g; ctx.fillRect(-20, -20, W + 40, H + 40);
+  }
+  function endAttack() {
+    attackEnd = 2.4;
+    for (const b of eb) spark(b.x, b.y, '255,220,150', 2);
+    eb = []; beams = [];
+    for (const o of enemies) if (!o.dead) { o.dead = true; explode(o.x, o.y, o.isBoss ? 2 : 0.8); }
+    enemies = [];
+    survBonus = player.dead ? 0 : Math.round(player.hp * 3000 * D.score);
+    score += survBonus;
+    showBanner('시간 종료', survBonus ? '생존 보너스 +' + fmt(survBonus) : '3분 출격 종료', 2.2);
+    flashColor = '255,240,220'; flashT = 0.4;
+    fanfare(); buzz([40, 30, 40]);
   }
 
   function drawLaser() {
@@ -3679,6 +3988,16 @@ function makeShooter() {
       }
     }
     for (const e of enemies) {
+      if (e.type === 'sniper' && (e.mode === 'aim' || e.mode === 'lock')) {
+        const lock = e.mode === 'lock';
+        ctx.strokeStyle = lock ? `rgba(255,80,90,${0.6 + 0.4 * Math.sin(time * 50)})` : 'rgba(255,90,100,0.32)';
+        ctx.lineWidth = lock ? 2.5 : 1;
+        ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.aimA) * 900, e.y + Math.sin(e.aimA) * 900); ctx.stroke();
+      }
+      if (e.type === 'mine' && e.arm) {
+        ctx.strokeStyle = `rgba(255,90,90,${0.4 + 0.4 * Math.sin(time * 40)})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, 82, 0, TAU); ctx.stroke();
+      }
       if (e.type === 'ace' && e.mode === 'warn') {
         ctx.strokeStyle = `rgba(255,80,100,${0.5 + 0.5 * Math.sin(time * 40)})`; ctx.lineWidth = 3; ctx.setLineDash([12, 8]);
         ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(e.face) * 900, e.y + Math.sin(e.face) * 900); ctx.stroke();
@@ -3700,11 +4019,12 @@ function makeShooter() {
       bossKind = BOSS_ORDER[0]; ult = null; ultReady = true; ending = null;
       camp = { act: 1, orig: PLANES.indexOf(P), pool: CRAFT_ORDER.slice(0, 3), next: 3, done: [], craft: null, chStage: -1, chapter: 0 };
       finale = null; freezeT = 0; shieldT = 0; droneT = 0; boltT = 0; bossShadow = false;
+      bossDuo = null; attackT = 0; attackEnd = 0; grazes = 0; grazeSfx = 0; survBonus = 0; ruleWind = 0; stormT = 4; clouds = null;
       stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false;
       setSky(0);
       if (opts && opts.endless) {
         const ch = opts.endless;
-        camp.act = 4; camp.endless = true;
+        camp.act = 4; camp.endless = true; camp.rules = [];
         if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
         else { camp.orig = ch.orig; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
         player.power = 3; player.bombs = D.bombs + 1;
@@ -3713,8 +4033,14 @@ function makeShooter() {
         later(2.6, () => floatText(player.x, player.y - 50, '모의 전투 훈련 · ' + P.name, '220,235,255'));
         return;
       }
+      if (opts && opts.attack) {
+        camp.attack = true; attackT = ATTACK_TIME;
+        startStage();
+        later(2.6, () => floatText(player.x, player.y - 50, '3분 출격 · 무기 ' + P.weaponName, '220,235,255'));
+        return;
+      }
       if (run) {
-        score = run.score; kills = run.kills; continues = run.continues; stageNo = run.stage;
+        score = run.score; kills = run.kills; continues = run.continues; stageNo = run.stage; grazes = run.grazes || 0;
         if (run.camp) camp = JSON.parse(JSON.stringify(run.camp)); else if (run.stage > BOSS_ORDER.length) camp.act = 4;
         if (camp.craft) setPlane(craftById(camp.craft)); else if (camp.act >= 3) setPlane(finalPlane());
         Object.assign(player, { hp: run.hp, maxHp: run.maxHp, power: run.power, bombs: run.bombs, inv: 3 });
@@ -3757,6 +4083,14 @@ function makeShooter() {
         if (scene.t > ln.text.length / 45 + 3.4) { scene.t = 999; advanceScene(); }
         return;
       }
+      const rawDt = dt;
+      if (attackEnd > 0) { attackEnd -= rawDt; if (attackEnd <= 0) App.end(); return; }
+      if (camp.attack && !player.dead) {
+        const before = Math.ceil(attackT);
+        attackT -= rawDt;
+        if (attackT <= 10 && Math.ceil(attackT) < before && attackT > 0) tone(880, 0.08, 'square', 0.03);
+        if (attackT <= 0) { attackT = 0; endAttack(); return; }
+      }
       if (slowT > 0) { slowT -= dt; dt *= 0.35; }
       stageTime += dt;
       for (const tm of timers) { tm.t -= dt; if (tm.t <= 0 && !tm.done) { tm.done = true; tm.fn(); } }
@@ -3767,7 +4101,7 @@ function makeShooter() {
       const p = player;
       if (p.dead) {
         deathT -= dt; updateWorld(dt);
-        if (deathT <= 0) App.askContinue();
+        if (deathT <= 0) { if (camp.attack) App.end(); else App.askContinue(); }
         return;
       }
       const { mx, my } = moveInput();
@@ -3817,13 +4151,14 @@ function makeShooter() {
         clearT -= dt;
         if (clearT <= 0) nextStage();
       } else if (!bossSpawned) {
-        if (stageTime >= STAGE_LEN) { if (enemies.length === 0 || stageTime >= STAGE_LEN + 4) spawnBoss(); }
+        if (stageTime >= stageLen()) { if (enemies.length === 0 || stageTime >= stageLen() + 4) spawnBoss(); }
         else {
           spawnT -= dt;
-          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn; }
+          if (spawnT <= 0) { spawnWave(); spawnT = Math.max(0.85, rand(1.3, 2.1) - Math.max(0.04 * grow(), 0.14 + 0.012 * grow())) * D.spawn * (hasRule('swarm') ? 0.75 : 1); }
         }
       }
       updateWorld(dt);
+      updateRules(dt);
       if (scene) return;
       if (bossSpawned && clearT <= 0) {
         const b = enemies.find(e => e.isBoss && e.type !== 'turret' && !e.dead);
@@ -3883,9 +4218,10 @@ function makeShooter() {
       drawSkyBack();
       const bossOn = bossParts().length > 0;
       if (bossOn) { ctx.fillStyle = 'rgba(30,0,20,0.22)'; ctx.fillRect(-20, -20, W + 40, H + 40); }
-      for (const it of items) drawItem(it);
       for (const e of enemies) if (e.type !== 'turret') drawEnemy(e);
       for (const e of enemies) if (e.type === 'turret') drawEnemy(e);
+      if (hasRule('night') && !finale) drawNight();
+      for (const it of items) drawItem(it);
       if (finale) drawFinale();
       drawBeams();
       if (windNow) {
@@ -3921,6 +4257,7 @@ function makeShooter() {
       }
       drawParts();
       drawEnemyBullets(eb);
+      if (hasRule('storm')) drawClouds();
       drawSkyFront();
       if (bossOn) {
         const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.72);
@@ -3929,10 +4266,22 @@ function makeShooter() {
       }
     },
     hud() {
-      panel(10, 10, 168, 46);
+      const ext = grazeOn(), top = ext ? 76 : 60;
+      panel(10, 10, 168, ext ? 64 : 46);
       label('점수', 20, 16);
-      label('STAGE ' + stageNo + ' · ' + D.name, 92, 16);
+      if (camp.attack) {
+        const tt = Math.ceil(attackT), warn = attackT <= 30;
+        label('STAGE ' + stageNo + ' · 남은 ' + Math.floor(tt / 60) + ':' + String(tt % 60).padStart(2, '0'), 72, 16, warn && Math.sin(time * 10) > -0.3 ? '#ff7a8a' : '#ffb36b');
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(20, 70, 148, 2);
+        ctx.fillStyle = warn ? '#ff5d73' : '#7fd8ff'; ctx.fillRect(20, 70, 148 * attackT / ATTACK_TIME, 2);
+        if (attackT <= 10 && attackT > 0 && !player.dead) {
+          ctx.save(); ctx.globalAlpha = 0.35 + 0.3 * (attackT % 1);
+          bigText(String(Math.ceil(attackT)), W / 2, 150, 64, 'center');
+          ctx.restore();
+        }
+      } else label('STAGE ' + stageNo + ' · ' + D.name, 92, 16);
       bigText(fmt(score), 20, 29);
+      if (ext) label('스치기 ' + grazes + (camp.act === 4 ? ' · 점수 ×' + scoreMul().toFixed(1) + ' · 규칙 ' + ((camp.rules || []).length) : ''), 20, 55, '#c9ecff');
       const bx = 14, by = H - 106;
       panel(bx - 4, by - 6, 170, 98);
       label('기체', bx + 4, by, '#d8d2ea');
@@ -3959,6 +4308,7 @@ function makeShooter() {
         const hp = bp.reduce((s, e) => s + Math.max(0, e.hp), 0);
         const all = enemies.filter(e => e.isBoss).reduce((s, e) => s + e.maxHp, 0);
         const f = all ? Math.min(1, hp / all) : 0, w2 = W - 40;
+        ctx.save(); ctx.translate(0, top - 60);
         ctx.fillStyle = 'rgba(30,6,16,0.8)'; rr(16, 60, w2 + 8, 40, 8); ctx.fill();
         ctx.strokeStyle = 'rgba(255,77,109,0.7)'; ctx.lineWidth = 1.5; rr(16, 60, w2 + 8, 40, 8); ctx.stroke();
         ctx.font = '14px "Black Han Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -3969,10 +4319,11 @@ function makeShooter() {
         g.addColorStop(0, '#ff2d55'); g.addColorStop(1, f > 0.5 ? '#ff9a6b' : '#ff2d55');
         ctx.fillStyle = g; rr(24, 83, Math.max(0, (w2 - 8) * f), 10, 5); ctx.fill();
         ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(24 + (w2 - 8) / 2 - 1, 81, 2, 14);
+        ctx.restore();
       } else if (!bossSpawned) {
-        const f = Math.min(1, stageTime / STAGE_LEN);
-        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(20, 64, W - 40, 3);
-        ctx.fillStyle = '#ffb36b'; ctx.fillRect(20, 64, (W - 40) * f, 3);
+        const f = Math.min(1, stageTime / stageLen());
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(20, top + 4, W - 40, 3);
+        ctx.fillStyle = '#ffb36b'; ctx.fillRect(20, top + 4, (W - 40) * f, 3);
       }
       if (ult) drawUltCutin();
       if (scene) {
@@ -3984,10 +4335,22 @@ function makeShooter() {
     score: () => score,
     music: () => (ending ? 'menu' : finale ? 'boss' : bossSpawned && clearT <= 0 && bossParts().length ? 'boss' : 'stage'),
     cinematic: () => !!ending || !!finale,
-    reason: () => '임무 종료',
+    reason: () => (camp.attack ? (player.dead ? '격추됨' : '시간 종료') : '임무 종료'),
     continueInfo: () => ({ score, stage: stageNo, used: continues }),
-    recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, planeId: P.id }),
-    stats: () => [['점수', fmt(score)], ['조종사', P.pilot.name + ' · ' + P.name], ['난이도', D.name], ['도달 스테이지', stageNo], ['격추 수', kills], ['이어하기', continues + '번']],
+    recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, attack: !!camp.attack, planeId: P.id }),
+    retryOpts() {
+      if (camp.attack) return { attack: true };
+      if (camp.endless) { const ch = endlessChoices().find(c => c.id === P.id); if (ch) return { endless: ch }; }
+      return undefined;
+    },
+    stats() {
+      const rows = [['점수', fmt(score)], ['조종사', P.pilot.name + ' · ' + P.name], ['난이도', D.name], ['도달 스테이지', stageNo], ['격추 수', kills]];
+      if (grazeOn()) rows.push(['스치기', grazes + '번']);
+      if (camp.attack) rows.push(['생존 보너스', fmt(survBonus)]);
+      else rows.push(['이어하기', continues + '번']);
+      if (camp.act === 4) rows.push(['변이 규칙', (camp.rules || []).map(id => RULES[id].name).join(', ') || '없음']);
+      return rows;
+    },
   };
   return api;
 }
@@ -3999,7 +4362,50 @@ const ORDER = ['shooter'];
 const App = {
   mode: 'menu', game: null, offers: null,
   setup: { plane: Save.settings.plane, diff: Save.settings.diff },
-  openSetup() { initAudio(); App.mode = 'setup'; App.game = null; renderSetup(); syncUI(); },
+  setupMode: 'story',
+  fresh: Save.fresh(),
+  menuSel: Save.fresh() ? 0 : clamp(Save.settings.mode === undefined ? 1 : Save.settings.mode, 0, 2),
+  openSetup(mode = 'story') { initAudio(); App.setupMode = mode; App.mode = 'setup'; App.game = null; renderSetup(); syncUI(); },
+  launch() { App.start('shooter', null, App.setupMode === 'attack' ? { attack: true } : undefined); },
+  selMode(i) { App.menuSel = (i + 3) % 3; syncUI(); },
+  chooseMode(i) {
+    App.menuSel = i;
+    if (i === 2 && !Save.seenEnding('final')) { initAudio(); tone(160, 0.15, 'square', 0.03, 120); syncUI(); return; }
+    Save.set('mode', i); App.fresh = false;
+    if (i === 0) App.openSetup('attack');
+    else if (i === 1) App.openSetup('story');
+    else App.openEndlessHangar();
+  },
+  rule: null,
+  openRules(list, stage, have, nextMul, cb) {
+    App.rule = { list, cb };
+    App.mode = 'rule';
+    $('ruleEyebrow').textContent = '무한 모드 · STAGE ' + stage;
+    $('ruleNow').textContent = (have.length ? '지금 규칙: ' + have.join(', ') + ' · ' : '') + '고르면 점수 ×' + nextMul.toFixed(1);
+    const box = $('ruleList');
+    box.textContent = '';
+    list.forEach((r, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'card';
+      const key = document.createElement('span'); key.className = 'card-key'; key.textContent = i + 1;
+      const body = document.createElement('span'); body.className = 'card-body';
+      const nm = document.createElement('b'); nm.textContent = r.name;
+      const ds = document.createElement('span'); ds.textContent = r.desc;
+      body.append(nm, ds);
+      const bonus = document.createElement('span'); bonus.className = 'card-best'; bonus.textContent = '점수';
+      const st = document.createElement('strong'); st.textContent = '+0.3'; bonus.append(st);
+      b.append(key, body, bonus);
+      b.addEventListener('click', () => App.pickRule(i));
+      box.append(b);
+    });
+    syncUI();
+  },
+  pickRule(i) {
+    const r = App.rule;
+    if (App.mode !== 'rule' || !r || !r.list[i]) return;
+    App.rule = null; App.mode = 'play'; syncUI();
+    r.cb(r.list[i].id);
+  },
   setSetup(key, v) {
     App.setup[key] = v;
     Save.set(key, v);
@@ -4046,8 +4452,9 @@ const App = {
   },
   start(id, run, opts) {
     initAudio();
+    hitStop = 0; hurtFx = 0; App.rule = null;
     App.hangar = null;
-    if (!run) Save.clearRun();
+    if (!run && !(opts && opts.attack)) Save.clearRun();   // the 3-minute mode keeps the saved story run
     const g = GAMES[id];
     App.game = g;
     parts = []; shake = 0; flashT = 0; banner.t = 0; drag = null;
@@ -4056,7 +4463,7 @@ const App = {
     App.mode = 'play';
     syncUI();
   },
-  retry() { if (App.game) App.start(App.game.id); },
+  retry() { if (App.game) App.start(App.game.id, null, App.game.retryOpts ? App.game.retryOpts() : undefined); },
   resume() {
     const r = Save.run;
     if (!r) return;
@@ -4078,17 +4485,18 @@ const App = {
     const g = App.game, s = g.score();
     App.mode = 'over';
     const ri = g.recordInfo();
-    const nb = ri.endless ? Save.endlessRecord(ri.planeId, ri.diff, s, ri.nc) : Save.record(ri.plane, ri.diff, s, ri.nc);
-    const b = ri.endless ? Save.endlessBest(ri.planeId, ri.diff) : Save.best(ri.plane, ri.diff);
-    Save.clearRun();
+    const nb = ri.attack ? Save.attackRecord(ri.plane, ri.diff, s) : ri.endless ? Save.endlessRecord(ri.planeId, ri.diff, s, ri.nc) : Save.record(ri.plane, ri.diff, s, ri.nc);
+    const b = ri.attack ? { all: Save.attackBest(ri.plane, ri.diff) } : ri.endless ? Save.endlessBest(ri.planeId, ri.diff) : Save.best(ri.plane, ri.diff);
+    if (!ri.attack) Save.clearRun();
     $('overEyebrow').textContent = nb.nc ? '노컨티뉴 신기록' : nb.all ? '새 최고 기록' : g.reason();
-    $('overTitle').textContent = '임무 종료';
-    const rows = g.stats().concat([
+    $('overTitle').textContent = ri.attack ? '3분 출격 종료' : '임무 종료';
+    $('storyCta').hidden = $('storyCtaBtn').hidden = !ri.attack;
+    const rows = g.stats().concat(ri.attack ? [['3분 출격 최고', fmt(b.all)]] : [
       [ri.endless ? '무한 최고 (일반)' : '최고 기록 (일반)', fmt(b.all)],
       [ri.endless ? '무한 최고 (노컨티뉴)' : '최고 기록 (노컨티뉴)', b.nc ? fmt(b.nc) : '없음'],
       ['엔딩 수집', Save.endingCount() + ' / 12'],
     ]);
-    if (!ri.nc) rows.push(['노컨티뉴 기록', '이어하기를 해서 제외']);
+    if (!ri.nc && !ri.attack) rows.push(['노컨티뉴 기록', '이어하기를 해서 제외']);
     const box = $('overStats');
     box.textContent = '';
     for (const [k, v] of rows) {
@@ -4108,6 +4516,7 @@ function syncUI() {
   $('hangarScr').hidden = m !== 'hangar';
   $('setupScr').hidden = m !== 'setup';
   $('contScr').hidden = m !== 'continue';
+  $('ruleScr').hidden = m !== 'rule';
   $('bombBtn').hidden = !(m === 'play' && App.game && App.game.hasBomb);
   $('pauseBtn').hidden = m !== 'play' && m !== 'paused';
   $('soundBtn').textContent = muted ? '효과음 끔' : '효과음 켬';
@@ -4117,7 +4526,17 @@ function syncUI() {
   $('endCount').textContent = Save.endingCount();
   const run = Save.run;
   $('resumeRunBtn').hidden = !run;
-  $('endlessBtn').hidden = !Save.seenEnding('final');
+  const open = Save.seenEnding('final');
+  [0, 1, 2].forEach(i => $('mode' + i).setAttribute('aria-pressed', String(i === App.menuSel)));
+  $('mode2').classList.toggle('locked', !open);
+  $('mode2').setAttribute('aria-disabled', String(!open));
+  $('endlessDesc').textContent = open ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙이 쌓여요.' : '잠겨 있어요. 스토리 모드에서 최종 엔딩을 보면 열려요.';
+  const eb = $('endlessBestBox');
+  eb.textContent = open ? '최고' : '잠김';
+  if (open) { const st = document.createElement('strong'); st.textContent = fmt(Save.endlessTop()); eb.append(st); }
+  $('bestAttack').textContent = fmt(Save.attackTop());
+  $('freshBadge').hidden = !App.fresh;
+  for (const id of ['vibeBtn', 'vibeMenuBtn']) { $(id).hidden = !canVibe; $(id).textContent = Save.settings.vibe ? '진동 켬' : '진동 끔'; }
   $('runInfo').hidden = !run;
   if (run) $('runInfo').textContent = `저장된 진행: ${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
 }
@@ -4127,12 +4546,19 @@ window.addEventListener('keydown', e => {
   if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
   const m = App.mode;
   if (m === 'menu') {
-    if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); App.openSetup(); }
+    const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+    if (d >= 0 && !e.repeat) App.chooseMode(d % 3);
+    if (e.code === 'ArrowUp' || e.code === 'KeyW') App.selMode(App.menuSel - 1);
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') App.selMode(App.menuSel + 1);
+    if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); App.chooseMode(App.menuSel); }
+  } else if (m === 'rule') {
+    const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
+    if (d >= 0 && !e.repeat) App.pickRule(d % 3);
   } else if (m === 'setup') {
     const i = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
     const j = ['Digit4', 'Numpad4'].includes(e.code) ? 3 : i % 3;
     if (i >= 0 || j === 3) App.setSetup('plane', j);
-    if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.start('shooter'); }
+    if (!e.repeat && e.code === 'Enter') { e.preventDefault(); App.launch(); }
     if (e.code === 'Escape') App.menu();
   } else if (m === 'hangar') {
     const h = App.hangar, E = h && h.opts.endless;
@@ -4178,12 +4604,13 @@ const endDrag = e => { if (drag && e.pointerId === drag.id) drag = null; };
 cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', endDrag);
 
-$('startBtn').addEventListener('click', () => App.openSetup());
+[0, 1, 2].forEach(i => $('mode' + i).addEventListener('click', () => App.chooseMode(i)));
+$('storyCtaBtn').addEventListener('click', () => App.openSetup('story'));
+for (const id of ['vibeBtn', 'vibeMenuBtn']) $(id).addEventListener('click', () => { Save.set('vibe', !Save.settings.vibe); buzz(40); syncUI(); });
 $('resumeRunBtn').addEventListener('click', () => App.resume());
 $('hangarGo').addEventListener('click', () => App.pickHangar());
 $('hangarBack').addEventListener('click', () => App.menu());
-$('endlessBtn').addEventListener('click', () => App.openEndlessHangar());
-$('launchBtn').addEventListener('click', () => App.start('shooter'));
+$('launchBtn').addEventListener('click', () => App.launch());
 $('setupBackBtn').addEventListener('click', () => App.menu());
 $('contYes').addEventListener('click', () => App.cont());
 $('contNo').addEventListener('click', () => { if (App.mode === 'continue') App.end(); });
@@ -4307,6 +4734,8 @@ function renderSetup() {
     b.title = seen ? '엔딩을 봤어요' : '';
   });
   [...seg.children].forEach((b, i) => b.setAttribute('aria-checked', String(i === App.setup.diff)));
+  const atk = App.setupMode === 'attack';
+  $('setupEyebrow').textContent = atk ? '3분 출격 · 스코어 어택' : '스토리 모드 · 돌아오지 않은 편대';
   $('diffDesc').textContent = DIFFS[App.setup.diff].desc;
   const pl = PLANES[App.setup.plane], boss = BOSS_INFO[pl.pilot.link];
   info.textContent = '';
@@ -4316,7 +4745,8 @@ function renderSetup() {
   add('pi-link', `인연의 보스: ${boss.title} ${boss.name}`);
   add('pi-kit', `무기 ${pl.weaponName} · 폭탄 ${pl.bombName}`);
   const rb = Save.best(App.setup.plane, App.setup.diff), cl = Save.clears(App.setup.plane, App.setup.diff);
-  add('pi-rec', `${DIFFS[App.setup.diff].name} 최고 ${fmt(rb.all)} · 노컨티뉴 ${rb.nc ? fmt(rb.nc) : '없음'}` + (cl.nc ? ' · 노컨티뉴 클리어' : cl.clear ? ' · 클리어' : ''));
+  add('pi-rec', atk ? `${DIFFS[App.setup.diff].name} 3분 출격 최고 ${fmt(Save.attackBest(App.setup.plane, App.setup.diff))} · 판정이 작을수록 스치기가 쉬워요`
+    : `${DIFFS[App.setup.diff].name} 최고 ${fmt(rb.all)} · 노컨티뉴 ${rb.nc ? fmt(rb.nc) : '없음'}` + (cl.nc ? ' · 노컨티뉴 클리어' : cl.clear ? ' · 클리어' : ''));
   const stat = add('pstat', '');
   ['속도', '내구', '화력'].forEach((lab, k) => {
     const l = document.createElement('span'); l.textContent = lab;
@@ -4362,8 +4792,9 @@ function update(dt) {
   shake = Math.max(0, shake - dt);
   flashT = Math.max(0, flashT - dt);
   if (App.mode === 'menu' || App.mode === 'setup') { updateSky(dt); updateParts(dt); menuProp += dt * 40; }
-  else if (App.mode === 'play') { App.game.update(dt); updateParts(dt); }
-  else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar') { updateSky(dt, 0.4); updateParts(dt); }
+  hurtFx = Math.max(0, hurtFx - dt);
+  if (App.mode === 'play') { if (hitStop > 0) hitStop -= dt; else { App.game.update(dt); updateParts(dt); } }
+  else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar' || App.mode === 'rule') { updateSky(dt, 0.4); updateParts(dt); }
 }
 function draw() {
   ctx.save();
@@ -4377,7 +4808,13 @@ function draw() {
   }
   ctx.restore();
   if (flashT > 0) { ctx.fillStyle = `rgba(${flashColor},${Math.min(0.85, flashT * 1.2)})`; ctx.fillRect(0, 0, W, H); }
-  if (App.game && App.mode !== 'menu' && App.mode !== 'over' && App.mode !== 'hangar') { App.game.hud(); drawBanner(); }
+  if (hurtFx > 0 && App.mode === 'play') {
+    const a = Math.min(1, hurtFx / 0.6), g = ctx.createRadialGradient(W / 2, H / 2, H * 0.32, W / 2, H / 2, H * 0.72);
+    g.addColorStop(0, 'rgba(255,30,60,0)'); g.addColorStop(1, `rgba(255,30,60,${0.55 * a})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = `rgba(255,70,90,${0.9 * a * (0.6 + 0.4 * Math.sin(time * 40))})`; ctx.lineWidth = 10; ctx.strokeRect(5, 5, W - 10, H - 10);
+  }
+  if (App.game && App.mode !== 'menu' && App.mode !== 'over' && App.mode !== 'hangar' && App.mode !== 'rule') { App.game.hud(); drawBanner(); }
 }
 let last = performance.now();
 function frame(now) {
