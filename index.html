@@ -288,6 +288,8 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 .lockmsg { margin: 0; padding: 6px 12px; font: 14px var(--display); letter-spacing: 0.03em; color: #ffd966; background: rgba(255, 217, 102, 0.12); border: 1px solid rgba(255, 217, 102, 0.5); border-radius: 8px; }
 .card-sub b { font: 14px var(--display); font-weight: 400; color: var(--flare); letter-spacing: 0.03em; }
 .card-sub:hover { background: rgba(255, 154, 74, 0.22); }
+.card-sub.info, .card-sub.info:hover { cursor: default; border-style: solid; border-color: var(--card-line); background: rgba(255, 255, 255, 0.05); }
+.card-sub.info b { color: #ffd3a8; }
 .card-sub:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
 @media (hover: none) { .kbd-hint { display: none; } }
 @media (max-height: 900px) { #menuScr .lead, #menuScr .keys { display: none; } }
@@ -324,6 +326,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
       </ul>
       <div class="games" id="modeList">
         <button class="card" id="mode0" type="button"><span class="card-key">1</span><span class="card-body"><span class="badge" id="freshBadge" hidden>처음이라면 여기부터</span><b>3분 출격</b><span>3분 동안 점수를 겨루는 스코어 어택이에요. 탄을 아슬아슬하게 스치면 점수가 붙어요.</span></span><span class="card-best">최고<strong id="bestAttack">0</strong></span></button>
+        <div class="card-sub info" id="attackInfo" hidden><b>최근 기록</b><span id="attackInfoText"></span></div>
         <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 33스테이지, 엔딩 16개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/16</strong></span></button>
         <button class="card-sub" id="resumeRunBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="runInfo"></span></button>
         <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
@@ -509,6 +512,8 @@ const Save = (() => {
     fresh: () => d.settings.mode === undefined && !d.run && !Object.keys(d.best).length && !Object.keys(d.attack).length && !Object.keys(d.endings).length,
     attackBest: (p, df) => d.attack[recKey(p, df)] || 0,
     attackTop: () => Object.values(d.attack).reduce((m, v) => Math.max(m, v), 0),
+    get attackLast() { return d.attackLast || null; },
+    setAttackLast(o) { d.attackLast = o; write(); },
     attackRecord(p, df, score) {
       const k = recKey(p, df), b = d.attack[k] || 0, res = { all: score > b, nc: false };
       if (res.all) { d.attack[k] = score; write(); }
@@ -5043,6 +5048,7 @@ const App = {
     const g = App.game, s = g.score();
     App.mode = 'over';
     const ri = g.recordInfo();
+    if (ri.attack) { const st = g.stats().find(r => r[0] === '도달 스테이지'); Save.setAttackLast({ plane: ri.plane, diff: ri.diff, stage: st ? st[1] : 1, score: s }); }
     const nb = ri.attack ? Save.attackRecord(ri.plane, ri.diff, s) : ri.endless ? Save.endlessRecord(ri.planeId, ri.diff, s, ri.nc) : Save.record(ri.plane, ri.diff, s, ri.nc);
     const b = ri.attack ? { all: Save.attackBest(ri.plane, ri.diff) } : ri.endless ? Save.endlessBest(ri.planeId, ri.diff) : Save.best(ri.plane, ri.diff);
     if (!ri.attack) Save.clearRun(ri.endless ? 'endless' : 'story');
@@ -5097,7 +5103,10 @@ function syncUI() {
   $('resumeKeyHint').hidden = !(run || erun);
   if (run) $('runInfo').textContent = `${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
   $('resumeEndlessBtn').hidden = !erun;
-  $('menuScr').classList.toggle('two-runs', !!(run && erun));
+  const al = Save.attackLast;
+  $('attackInfo').hidden = !al;
+  if (al) $('attackInfoText').textContent = `${PLANES[al.plane].pilot.name} · ${DIFFS[al.diff].name} · STAGE ${al.stage} · 점수 ${fmt(al.score)}`;
+  $('menuScr').classList.toggle('two-runs', [run, erun, al].filter(Boolean).length >= 1);   // any strip: card descriptions shrink to one line on phones
   if (erun) {
     const c = erun.camp || {}, nm = c.craft ? craftById(c.craft).name : PLANES[c.endPlane !== undefined ? c.endPlane : erun.plane].name;
     $('erunInfo').textContent = `${nm} · ${DIFFS[erun.diff].name} · STAGE ${erun.stage} · 점수 ${fmt(erun.score)}`;
