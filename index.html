@@ -293,7 +293,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 @media (max-height: 900px) { #menuScr .lead, #menuScr .keys { display: none; } }
 @media (max-width: 520px), (max-height: 600px) { #pauseScr .keys { display: none; } }
 @media (max-width: 370px), (max-height: 560px) { #hangarScr.endless h2 { display: none; } }
-@media (max-width: 520px), (max-height: 760px) { .gcard span { display: none; } .gcard b { font-size: 10.5px; } #galleryScr .eyebrow { font-size: 11px; } }
+@media (max-width: 520px), (max-height: 760px) { .gcard span { display: none; } .gcard b { font-size: 10.5px; } #galleryScr .eyebrow { font-size: 11px; } .gcard canvas { aspect-ratio: 160 / 82; object-fit: cover; } }
 .linkbtn { background: none; border: 0; padding: 4px 6px; color: var(--muted); font: 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .linkbtn:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
 #storyCta { max-width: 32ch; color: #ffd3a8; }
@@ -2329,6 +2329,7 @@ function makeShooter() {
   }
   function spawnFoes() {
     const rows = FOE_WAVES.filter(r => ei() >= r[0]);
+    if (!rows.length) rows.push(FOE_WAVES[0]);   // never empty, even before the first endless stage
     let w = Math.random() * rows.reduce((a, r) => a + r[1], 0), row = rows[0];
     for (const r of rows) { w -= r[1]; if (w <= 0) { row = r; break; } }
     const [, , type, n, form] = row;
@@ -3721,7 +3722,7 @@ function makeShooter() {
   }
   function saveRun() {
     if (camp.attack) return;
-    Save.setRun({ plane: camp.orig, diff: DIFFS.indexOf(D), stage: stageNo, score, kills, continues,
+    Save.setRun({ plane: camp.orig, diff: DIFFS.indexOf(D), stage: camp.act === 4 && camp.e0 ? Math.max(stageNo, camp.e0) : stageNo, score, kills, continues,
       hp: player.hp, maxHp: player.maxHp, power: player.power, bombs: player.bombs, grazes, camp: JSON.parse(JSON.stringify(camp)) });
   }
   function nextStage() {
@@ -3912,6 +3913,7 @@ function makeShooter() {
     clearT = 2.8; player.inv = 2;
     showBanner('무한 모드', '모의 전투 훈련 · ' + P.name, 2.8);
     fanfare();
+    saveRun();   // save the endless state now, so reopening does not replay the final boss
   }
   function drawFinale() {
     const f = finale, e = f.e;
