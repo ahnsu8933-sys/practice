@@ -113,13 +113,14 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .keys { font-size: 12px; gap: 4px 10px; }
   #menuScr .keys { display: none; }
   #setupScr #diffDesc, #setupScr .pi-link { display: none; }
-  #hangarScr #hangarNote, #hangarScr > p.small:last-child { display: none; }
+  #hangarScr #hangarNote, #hangarScr #hangarKeys { display: none; }
   #hangarList.compact .plane canvas { max-width: 40px; }
   #hangarScr.endless { gap: 5px; }
   #hangarScr.endless .btn { font-size: 17px; padding: 8px 22px; }
   #hangarScr.endless .pinfo { padding: 6px 10px; }
   #hangarScr.endless .eyebrow, #hangarScr.endless .pi-story.desc { display: none; }
   #hangarScr.endless .seg button { padding: 7px 14px; }
+  .lockmsg { font-size: 12px; padding: 3px 10px; }
   #hangarList.compact .plane b { font-size: 11px; }
   .pinfo { gap: 1px; }
   .lead { font-size: 13px; line-height: 1.45; }
@@ -264,7 +265,22 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 .card .badge { align-self: flex-start; font: 11px var(--display); letter-spacing: 0.06em; color: #2a1606; background: #ffd966; border-radius: 6px; padding: 2px 7px; margin-bottom: 2px; }
 #modeList, #ruleList { max-width: 400px; }
 #menuScr .keys { grid-template-columns: repeat(4, auto); gap: 4px 12px; }
-@media (max-height: 900px) { #menuScr .lead { display: none; } }
+.menu-inner { display: flex; flex-direction: column; align-items: center; gap: inherit; width: 100%; transform-origin: 50% 0; }
+.menu-inner > * { flex-shrink: 0; }
+.card-sub {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  width: 100%; margin-top: -4px; padding: 7px 14px;
+  text-align: left; font: 12px var(--body); color: var(--muted);
+  background: rgba(255, 154, 74, 0.12); border: 1px dashed var(--flare); border-radius: 10px; cursor: pointer;
+}
+.lockmsg { margin: 0; padding: 6px 12px; font: 14px var(--display); letter-spacing: 0.03em; color: #ffd966; background: rgba(255, 217, 102, 0.12); border: 1px solid rgba(255, 217, 102, 0.5); border-radius: 8px; }
+.card-sub b { font: 14px var(--display); font-weight: 400; color: var(--flare); letter-spacing: 0.03em; }
+.card-sub:hover { background: rgba(255, 154, 74, 0.22); }
+.card-sub:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
+@media (hover: none) { .kbd-hint { display: none; } }
+@media (max-height: 900px) { #menuScr .lead, #menuScr .keys { display: none; } }
+@media (max-width: 520px), (max-height: 600px) { #pauseScr .keys { display: none; } }
+@media (max-width: 370px), (max-height: 560px) { #hangarScr.endless h2 { display: none; } }
 .linkbtn { background: none; border: 0; padding: 4px 6px; color: var(--muted); font: 13px var(--body); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .linkbtn:focus-visible { outline: 2px solid var(--flare); outline-offset: 2px; }
 #storyCta { max-width: 32ch; color: #ffd3a8; }
@@ -282,6 +298,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
     <button class="chip" id="ultBtn" type="button" hidden>편대</button>
 
     <div class="overlay" id="menuScr">
+     <div class="menu-inner" id="menuInner">
       <p class="eyebrow">고도 3,200m · 구름바다 상공</p>
       <h1>구름바다<br>요격전</h1>
       <p class="lead">새벽 편대가 사라진 지 3년. 오늘은 얼마나 날아 볼까요?</p>
@@ -295,17 +312,22 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
       <div class="games" id="modeList">
         <button class="card" id="mode0" type="button"><span class="card-key">1</span><span class="card-body"><span class="badge" id="freshBadge" hidden>처음이라면 여기부터</span><b>3분 출격</b><span>3분 동안 점수를 겨루는 스코어 어택이에요. 탄을 아슬아슬하게 스치면 점수가 붙어요.</span></span><span class="card-best">최고<strong id="bestAttack">0</strong></span></button>
         <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 40스테이지, 엔딩 12개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/12</strong></span></button>
+        <button class="card-sub" id="resumeRunBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="runInfo"></span></button>
         <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
       </div>
-      <div class="actions">
-        <button class="btn ghost" id="resumeRunBtn" type="button" hidden>이어서 출격</button>
-      </div>
-      <p class="small" id="runInfo" hidden></p>
-      <p class="small">↑↓ 고르기 · Enter 시작 · 스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="vibeMenuBtn" type="button" hidden>진동 켬</button></p>
+      <p class="small"><span class="kbd-hint">↑↓ 고르기 · Enter 시작<span id="resumeKeyHint" hidden> · R 이어서</span> · </span>스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="vibeMenuBtn" type="button" hidden>진동 켬</button></p>
+     </div>
     </div>
 
     <div class="overlay" id="pauseScr" hidden>
       <h2>일시정지</h2>
+      <ul class="keys">
+        <li><b>이동</b></li><li>방향키 · WASD · 화면 드래그</li>
+        <li><b>사격</b></li><li>자동</li>
+        <li><b>폭탄</b></li><li>X 키 · 폭탄 버튼</li>
+        <li><b>편대 필살기</b></li><li>C 키 · 편대 버튼 (스테이지마다 1번)</li>
+        <li><b>일시정지</b></li><li>P · Esc</li>
+      </ul>
       <div class="actions">
         <button class="btn" id="resumeBtn" type="button">계속</button>
         <button class="btn ghost" id="pauseMenuBtn" type="button">처음 화면</button>
@@ -332,17 +354,21 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
     </div>
 
     <div class="overlay" id="hangarScr" hidden>
+     <div class="menu-inner" id="hangarInner">
       <p class="eyebrow" id="hangarEyebrow">회수 작전</p>
       <h2>격납고</h2>
       <div class="planes" id="hangarList"></div>
       <div class="pinfo" id="hangarInfo"></div>
+      <p class="lockmsg" id="hangarLockMsg" hidden></p>
       <div class="seg" id="hangarDiff" role="radiogroup" aria-label="난이도" hidden></div>
       <p class="small" id="hangarNote"></p>
       <div class="actions">
         <button class="btn" id="hangarGo" type="button">출격</button>
+        <button class="btn ghost" id="hangarStory" type="button" hidden>스토리 모드로</button>
         <button class="btn ghost" id="hangarBack" type="button" hidden>뒤로</button>
       </div>
       <p class="small" id="hangarKeys">1~3 기체 · Enter 출격</p>
+     </div>
     </div>
 
     <div class="overlay" id="ruleScr" hidden>
@@ -468,6 +494,21 @@ const Save = (() => {
 })();
 
 /* ================= sizing ================= */
+function fitMenu() {
+  fitScreen('menuScr', 'menuInner');
+  fitScreen('hangarScr', 'hangarInner');
+}
+function fitScreen(screenId, innerId) {
+  const m = document.getElementById(screenId), inner = document.getElementById(innerId);
+  if (!m || !inner || m.hidden || !inner.style || typeof getComputedStyle !== 'function') return;
+  inner.style.transform = ''; inner.style.marginBottom = '';
+  const cs = getComputedStyle(m), avail = m.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const h = inner.offsetHeight;
+  if (!h || h <= avail) return;
+  const k = Math.max(0.6, avail / h);
+  inner.style.transform = 'scale(' + k.toFixed(3) + ')';
+  inner.style.marginBottom = -(h * (1 - k)).toFixed(1) + 'px';
+}
 function fit() {
   const cw = wrap.clientWidth, ch = wrap.clientHeight;
   const w = Math.floor(Math.min(cw, ch * 2 / 3));
@@ -479,7 +520,8 @@ function fit() {
   cv.height = Math.round(h * dpr);
   ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
 }
-window.addEventListener('resize', fit);
+window.addEventListener('resize', () => { fit(); fitMenu(); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => fitMenu());
 fit();
 
 /* ================= audio ================= */
@@ -4595,7 +4637,6 @@ const App = {
   selMode(i) { App.menuSel = (i + 3) % 3; syncUI(); },
   chooseMode(i) {
     App.menuSel = i;
-    if (i === 2 && !Save.seenEnding('final')) { initAudio(); tone(160, 0.15, 'square', 0.03, 120); syncUI(); return; }
     Save.set('mode', i); App.fresh = false;
     if (i === 0) App.openSetup('attack');
     else if (i === 1) App.openSetup('story');
@@ -4647,6 +4688,7 @@ const App = {
     if (!App.hangar || !App.hangar.choices[i]) return;
     App.hangar.sel = i;
     renderHangar();
+    fitMenu();
   },
   openEndlessHangar() {
     initAudio();
@@ -4751,19 +4793,18 @@ function syncUI() {
   $('endCount').textContent = Save.endingCount();
   const run = Save.run;
   $('resumeRunBtn').hidden = !run;
-  const open = Save.seenEnding('final');
+  const openN = endlessChoices().filter(c => c.unlocked).length;
   [0, 1, 2].forEach(i => $('mode' + i).setAttribute('aria-pressed', String(i === App.menuSel)));
-  $('mode2').classList.toggle('locked', !open);
-  $('mode2').setAttribute('aria-disabled', String(!open));
-  $('endlessDesc').textContent = open ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙이 쌓여요.' : '잠겨 있어요. 스토리 모드에서 최종 엔딩을 보면 열려요.';
+  $('endlessDesc').textContent = openN ? '엔딩을 본 기체로 끝없이 싸워요. 5스테이지마다 변이 규칙이 바뀌어요.' : '엔딩을 본 기체로 끝없이 싸워요. 기체는 스토리 모드에서 열려요.';
   const eb = $('endlessBestBox');
-  eb.textContent = open ? '최고' : '잠김';
-  if (open) { const st = document.createElement('strong'); st.textContent = fmt(Save.endlessTop()); eb.append(st); }
+  eb.textContent = openN ? '최고' : '기체';
+  { const st = document.createElement('strong'); st.textContent = openN ? fmt(Save.endlessTop()) : openN + '/11'; eb.append(st); }
   $('bestAttack').textContent = fmt(Save.attackTop());
   $('freshBadge').hidden = !App.fresh;
   for (const id of ['vibeBtn', 'vibeMenuBtn']) { $(id).hidden = !canVibe; $(id).textContent = Save.settings.vibe ? '진동 켬' : '진동 끔'; }
-  $('runInfo').hidden = !run;
-  if (run) $('runInfo').textContent = `저장된 진행: ${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
+  $('resumeKeyHint').hidden = !run;
+  if (run) $('runInfo').textContent = `${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
+  if (m === 'menu' || m === 'hangar') fitMenu();
 }
 
 /* input wiring */
@@ -4776,6 +4817,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'ArrowUp' || e.code === 'KeyW') App.selMode(App.menuSel - 1);
     if (e.code === 'ArrowDown' || e.code === 'KeyS') App.selMode(App.menuSel + 1);
     if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); App.chooseMode(App.menuSel); }
+    if (!e.repeat && e.code === 'KeyR' && Save.run) App.resume();
   } else if (m === 'rule') {
     const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
     if (d >= 0 && !e.repeat) App.pickRule(d % 3);
@@ -4835,6 +4877,7 @@ for (const id of ['vibeBtn', 'vibeMenuBtn']) $(id).addEventListener('click', () 
 $('resumeRunBtn').addEventListener('click', () => App.resume());
 $('hangarGo').addEventListener('click', () => App.pickHangar());
 $('hangarBack').addEventListener('click', () => App.menu());
+$('hangarStory').addEventListener('click', () => App.openSetup('story'));
 $('launchBtn').addEventListener('click', () => App.launch());
 $('setupBackBtn').addEventListener('click', () => App.menu());
 $('contYes').addEventListener('click', () => App.cont());
@@ -4916,6 +4959,12 @@ function renderHangar() {
     ? `은퇴한 기체들이 모의 전투 훈련에 다시 나서요. 열린 기체 ${h.choices.filter(x => x.unlocked).length} / ${h.choices.length}`
     : h.choices.length > 1 ? '고른 기체는 이번 회수 작전(4구간)이 끝나면 엔딩을 보고 은퇴해요.' : '남은 회수 기체는 이 기체 하나예요.';
   $('hangarGo').disabled = E && !c.unlocked;
+  const none = E && !h.choices.some(x => x.unlocked);
+  $('hangarStory').hidden = !(fromMenu && !c.unlocked);
+  $('hangarGo').hidden = none;
+  if (none) $('hangarNote').textContent = '아직 열린 기체가 없어요. 스토리 모드를 진행해 엔딩을 보면 그 기체가 여기서 열려요.';
+  $('hangarLockMsg').hidden = !(E && !c.unlocked);
+  $('hangarLockMsg').textContent = none ? '🔒 열린 기체가 없어요 · 스토리 모드를 진행하세요' : '🔒 잠긴 기체예요 · 스토리 모드에서 엔딩을 보면 열려요';
   $('hangarBack').hidden = !fromMenu;
   const seg = $('hangarDiff');
   seg.hidden = !fromMenu;
