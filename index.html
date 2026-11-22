@@ -129,6 +129,10 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .card-body span { font-size: 12px; line-height: 1.3; }
   #menuScr .lead, #ruleScr .lead, #menuScr .eyebrow { display: none; }
   #menuScr .games, #ruleScr .games { gap: 6px; margin-top: 2px; }
+  #menuScr .card-sub { padding: 4px 10px; gap: 6px; flex-wrap: nowrap; margin-top: -3px; font-size: 11px; white-space: nowrap; overflow: hidden; }
+  #menuScr .card-sub b { font-size: 12px; flex-shrink: 0; }
+  #menuScr .card-sub span { overflow: hidden; text-overflow: ellipsis; }
+  #menuScr.two-runs .card-body > span:not(.badge) { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
 }
 .eyebrow { margin: 0; font-size: 13px; letter-spacing: 0.18em; color: var(--flare); }
 h1, h2 {
@@ -320,9 +324,10 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
       </ul>
       <div class="games" id="modeList">
         <button class="card" id="mode0" type="button"><span class="card-key">1</span><span class="card-body"><span class="badge" id="freshBadge" hidden>처음이라면 여기부터</span><b>3분 출격</b><span>3분 동안 점수를 겨루는 스코어 어택이에요. 탄을 아슬아슬하게 스치면 점수가 붙어요.</span></span><span class="card-best">최고<strong id="bestAttack">0</strong></span></button>
-        <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 33스테이지, 엔딩 12개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/12</strong></span></button>
+        <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 33스테이지, 엔딩 16개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/16</strong></span></button>
         <button class="card-sub" id="resumeRunBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="runInfo"></span></button>
         <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
+        <button class="card-sub" id="resumeEndlessBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="erunInfo"></span></button>
       </div>
       <p class="small"><span class="kbd-hint">↑↓ 고르기 · Enter 시작<span id="resumeKeyHint" hidden> · R 이어서</span> · </span>스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="galleryBtn" type="button">엔딩 갤러리</button> <button class="linkbtn" id="vibeMenuBtn" type="button" hidden>진동 켬</button></p>
      </div>
@@ -382,7 +387,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 
     <div class="overlay" id="galleryScr" hidden>
      <div class="menu-inner" id="galleryInner">
-      <p class="eyebrow" id="galleryCount">엔딩 0 / 12</p>
+      <p class="eyebrow" id="galleryCount">엔딩 0 / 16</p>
       <h2>엔딩 갤러리</h2>
       <div class="gallery" id="galleryList"></div>
       <div class="pinfo" id="galleryInfo"></div>
@@ -449,7 +454,7 @@ const Save = (() => {
   const KEY = 'cloudsea-save', VERSION = 1;
   const PIDS = ['swallow', 'hawk', 'ox', 'owl'], DIDS = ['easy', 'normal', 'hard'];
   const recKey = (p, d) => PIDS[p] + '-' + DIDS[d];
-  const blank = () => ({ v: VERSION, best: {}, clears: {}, endings: {}, endless: {}, attack: {}, run: null, settings: { plane: 1, diff: 1, music: true, sound: true, vibe: true } });
+  const blank = () => ({ v: VERSION, best: {}, clears: {}, endings: {}, endless: {}, attack: {}, run: null, erun: null, settings: { plane: 1, diff: 1, music: true, sound: true, vibe: true } });
   const read = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   let d = blank();
   try {
@@ -468,6 +473,8 @@ const Save = (() => {
       if (old > 0) d.best[recKey(d.settings.plane, d.settings.diff)] = { all: old, nc: 0 };
     }
   } catch (e) { d = blank(); }
+  // older saves kept one slot; an endless run found there moves to the endless slot
+  if (d.run && d.run.camp && d.run.camp.endless && !d.erun) { d.erun = d.run; d.run = null; }
   const write = () => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {} };
   write();
   return {
@@ -493,8 +500,12 @@ const Save = (() => {
     seenEnding: pilotId => !!d.endings[pilotId],
     endingCount: () => Object.keys(d.endings).length,
     get run() { return d.run; },
-    setRun(r) { d.run = r; write(); },
-    clearRun() { if (d.run) { d.run = null; write(); } },
+    get erun() { return d.erun; },
+    setRun(r) { if (r.camp && r.camp.endless) d.erun = r; else d.run = r; write(); },
+    clearRun(which) {
+      if (which === 'endless') { if (d.erun) { d.erun = null; write(); } }
+      else if (d.run) { d.run = null; write(); }
+    },
     fresh: () => d.settings.mode === undefined && !d.run && !Object.keys(d.best).length && !Object.keys(d.attack).length && !Object.keys(d.endings).length,
     attackBest: (p, df) => d.attack[recKey(p, df)] || 0,
     attackTop: () => Object.values(d.attack).reduce((m, v) => Math.max(m, v), 0),
@@ -2151,15 +2162,8 @@ const PART2 = {
   lastWord: { narae: '엄마, 하늘이 조용해. 이제 정말 집에 갈게.', maru: '새벽 편대, 이번엔 정말 전원 귀환이다.',
               bawi: '부순 건 여기까지. 이제 지을 차례다.', saebyeok: '언니, 끝났어. 새벽이야.' },
 };
-// the final ending closes with the epilogue of the pilot who flew it
-const FINAL_EPILOGUE = {
-  narae: ['한나래는 우편 조종사가 되었다.', '오늘도 어딘가에 가장 빠른 편지가 도착한다.'],
-  maru: ['강마루는 새벽 편대의 깃발을 다시 올렸다.', '빈 격납고 여덟 칸에 이름표가 하나씩 걸렸다.'],
-  bawi: ['도바위는 사람이 지키는 새 등대를 지었다.', '첫 불은 길잡이의 렌즈로 밝혔다.'],
-  saebyeok: ['윤새벽은 언니의 비행 기록을 끝까지 읽었다.', '"새벽이 오면, 날아." 올빼미는 아침에도 난다.'],
-};
 const FINAL_ENDING = { title: '새벽이 온 하늘', sky: ['#2a3f7a', '#f0a070', '#fff0c8'], text: [
-  '복제 공장이 무너지고, 밑바닥까지 빛이 닿았다.',
+  '복제 공장이 무너지고, 구름바다 밑바닥까지 빛이 닿았다.',
   '되찾은 기체들은 저마다의 자리로 돌아갔고, 새벽 편대는 다시 여덟 칸을 채웠다.',
   '이 하늘은 이제 누구의 것도 아닌, 모두의 하늘이다.'] };
 
@@ -3107,23 +3111,43 @@ function makeShooter() {
   }
 
   /* ---- ending screens: one per pilot, shown after the last boss, then round two begins ---- */
+  // part 1 endings: where each pilot stands after stage 8 (new scenes)
   const ENDINGS = {
-    narae: { title: '엄마의 무전', sky: ['#3f6fb5', '#8fc0ea', '#ffe9c9'], text: [
+    narae: { title: '엄마의 무전', sky: ['#2b2f5e', '#b0708a', '#f4c49a'], text: [
       '구름고래에 남아 있던 엄마의 무전을 들었다.',
       '하늘을 미워하지 않기로, 나래는 약속했다.',
       '이제 빼앗긴 기체들을 데려올 차례다.'] },
-    maru: { title: '반쪽짜리 보고', sky: ['#33305e', '#c9667a', '#ffc27a'], text: [
+    maru: { title: '반쪽짜리 보고', sky: ['#171a33', '#2e3358', '#6a6a8e'], text: [
       '폭풍눈이 멈추고, 편대장의 목소리가 끊겼다.',
       '"전원 귀환"은 아직 반쪽짜리 보고다.',
       '격납고 일곱 칸이 아직 비어 있다.'] },
-    bawi: { title: '책임의 절반', sky: ['#4a5a8a', '#e8a87c', '#ffe2b0'], text: [
+    bawi: { title: '책임의 절반', sky: ['#1f3a66', '#3f6a9e', '#9cc4e8'], text: [
       '방패별의 임무 종료를 직접 승인했다.',
       '부순 것은 절반, 남은 절반은 데려오는 일이다.',
       '정비반에 회수 기체의 도면이 펼쳐졌다.'] },
-    saebyeok: { title: '언니가 막아 준 하늘', sky: ['#141a40', '#4a3f8a', '#f0a0a8'], text: [
+    saebyeok: { title: '언니가 막아 준 하늘', sky: ['#0c0f26', '#251f4a', '#5a3a6a'], text: [
       '언니는 3년 동안 혼자 함대를 붙잡고 있었다.',
       '마지막 기록에 공장의 좌표가 남아 있었다.',
       '새벽은 아직 집에 가지 않는다. 끝을 보러 간다.'] },
+  };
+  // epilogues: the original pilot endings, shown last, after the final ending
+  const EPILOGUES = {
+    narae: { title: '가장 빠른 편지', sky: ['#3f6fb5', '#8fc0ea', '#ffe9c9'], text: [
+      '한나래는 우편 조종사가 되었다.',
+      '제비의 조종석에는 낡은 무전기 하나가 놓여 있다.',
+      '오늘도 구름바다 어딘가에, 가장 빠른 편지가 도착한다.'] },
+    maru: { title: '전원 귀환', sky: ['#33305e', '#c9667a', '#ffc27a'], text: [
+      '강마루는 새벽 편대의 깃발을 다시 올렸다.',
+      '빈 격납고 여덟 칸에는 이름표가 하나씩 걸렸다.',
+      '새 조종사들은 그를 편대장이라 부른다.'] },
+    bawi: { title: '사람이 지키는 등대', sky: ['#4a5a8a', '#e8a87c', '#ffe2b0'], text: [
+      '도바위는 방패별이 있던 자리에 새 등대를 짓고 있다.',
+      '이번 설계도에는 조종석이, 사람의 자리가 그려져 있다.',
+      '완공식 날, 첫 불은 길잡이의 렌즈로 밝힐 예정이다.'] },
+    saebyeok: { title: '새벽이 오면', sky: ['#141a40', '#4a3f8a', '#f0a0a8'], text: [
+      '윤새벽은 폭풍눈의 잔해에서 낡은 비행 기록 하나를 찾았다.',
+      '마지막 줄에는 이렇게 적혀 있었다. "새벽이 오면, 날아."',
+      '올빼미는 이제 아침에도 난다.'] },
   };
   function skipEnding() {
     if (!ending || ending.t < 2.5) return;
@@ -3236,16 +3260,97 @@ function makeShooter() {
       plane(ox, oy, 0.5, big(P.look, 1.35));
     }
   }
+  function part1Scene(id, t, al) {
+    const plane = (x, y, ang, look, a = 1) => drawPlane(x, y, ang, 0, a * al, t * 40, look);
+    const big = (look, sc) => Object.assign({}, look, { noShadow: true, scale: (look.scale || 1) * sc });
+    const bob = Math.sin(t * 1.3) * 6;
+    if (id === 'narae') {
+      // dusk: the whale drifts quietly, its radio still reaching the swallow
+      glowDot(380, 150, 120, '255,210,170', 0.5);
+      const wx = 300 + Math.sin(t * 0.4) * 8, wy = 200 + bob * 0.6;
+      glowDot(wx, wy, 120, '190,220,255', 0.25 + 0.1 * Math.sin(t * 2));
+      plane(wx, wy, 0, { kind: 'craft', type: 'whale', art: 0.62, accent: '#9fd0ff', scale: 1.7, noShadow: true });
+      const px = 130, py = 250 + bob;
+      for (let k = 0; k < 4; k++) {
+        const r = (t * 46 + k * 38) % 150, a = 1 - r / 150;
+        ctx.strokeStyle = `rgba(255,240,220,${al * a * 0.8})`; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(wx - 70, wy + 10, 20 + r, Math.PI - 0.45, Math.PI + 0.45); ctx.stroke();
+      }
+      ctx.fillStyle = `rgba(255,250,240,${al * (0.6 + 0.4 * Math.sin(t * 3))})`;
+      ctx.font = '16px "Black Han Sans", sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('…나래야', wx - 120, wy - 95);
+      plane(px, py, 0.25, big(P.look, 1.45));
+    } else if (id === 'maru') {
+      // the hangar at night: one bay filled, seven still empty
+      ctx.fillStyle = 'rgba(10,12,28,0.55)'; ctx.fillRect(0, 60, W, 360);
+      for (let i = 0; i < 4; i++) { const x = 60 + i * 120; glowDot(x, 74, 40, '255,220,150', 0.35 + 0.1 * Math.sin(t * 2 + i)); ctx.fillStyle = '#ffe9b0'; ctx.fillRect(x - 10, 68, 20, 5); }
+      const bays = [];
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) bays.push([60 + c * 120, 150 + r * 112]);
+      bays.forEach(([x, y], i) => {
+        ctx.strokeStyle = i === 0 ? 'rgba(255,217,102,0.9)' : 'rgba(200,210,240,0.35)'; ctx.lineWidth = 2;
+        if (i) ctx.setLineDash([6, 6]);
+        ctx.strokeRect(x - 48, y - 44, 96, 92);
+        ctx.setLineDash([]);
+        ctx.fillStyle = i === 0 ? '#ffd966' : 'rgba(220,225,245,0.5)'; ctx.fillRect(x - 22, y + 52, 44, 10);
+        if (i === 0) plane(x, y + Math.sin(t * 1.3) * 2, 0, big(P.look, 0.95));
+      });
+      const g = ctx.createLinearGradient(0, 60, 0, 420);
+      g.addColorStop(0, 'rgba(255,230,180,0.12)'); g.addColorStop(1, 'rgba(255,230,180,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(180, 60); ctx.lineTo(300, 60); ctx.lineTo(420, 420); ctx.lineTo(60, 420); ctx.closePath(); ctx.fill();
+    } else if (id === 'bawi') {
+      // a blueprint of the seven craft to bring home; the fortress is stamped "approved"
+      ctx.fillStyle = 'rgba(20,60,120,0.75)'; ctx.fillRect(30, 70, 420, 320);
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let x = 30; x <= 450; x += 20) { ctx.moveTo(x, 70); ctx.lineTo(x, 390); }
+      for (let y = 70; y <= 390; y += 20) { ctx.moveTo(30, y); ctx.lineTo(450, y); }
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.strokeRect(30, 70, 420, 320);
+      const spots = [[95, 140], [195, 140], [295, 140], [395, 140], [145, 250], [245, 250], [345, 250]];
+      CRAFTS.forEach((c, i) => {
+        const [x, y] = spots[i];
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x - 42, y - 38, 84, 76);
+        plane(x, y, 0, Object.assign({}, c.look, { noShadow: true, scale: (c.look.scale || 1) * 0.7 }), 0.85);
+        if (c.id === 'c_fortress') {
+          ctx.save(); ctx.translate(x + 18, y + 18); ctx.rotate(-0.25);
+          ctx.strokeStyle = `rgba(255,80,80,${al * 0.9})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 22, 0, TAU); ctx.stroke();
+          ctx.fillStyle = `rgba(255,80,80,${al * 0.9})`; ctx.font = '13px "Black Han Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('승인', 0, 1);
+          ctx.restore();
+        }
+      });
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '13px "Gowun Dodum", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('회수 기체 정비 도면 · 7기', 44, 80);
+      plane(390, 338 + bob, -0.2, big(P.look, 0.95));
+    } else {
+      // night over the storm: the coordinates her sister left, and the sister's afterimage letting her go
+      for (let i = 0; i < 40; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${al * (0.3 + 0.7 * ((Math.sin(t * 2 + i * 1.7) + 1) / 2))})`;
+        ctx.fillRect((i * 131) % W, (i * 83) % 260, i % 5 ? 2 : 3, i % 5 ? 2 : 3);
+      }
+      const tx = 320, ty = 300;
+      glowDot(tx, ty + 30, 160, '120,80,200', 0.45);
+      const p = 0.6 + 0.4 * Math.sin(t * 4);
+      ctx.strokeStyle = `rgba(255,90,110,${al * p})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(tx, ty, 22, 0, TAU); ctx.moveTo(tx - 34, ty); ctx.lineTo(tx - 12, ty); ctx.moveTo(tx + 12, ty); ctx.lineTo(tx + 34, ty); ctx.moveTo(tx, ty - 34); ctx.lineTo(tx, ty - 12); ctx.moveTo(tx, ty + 12); ctx.lineTo(tx, ty + 34); ctx.stroke();
+      ctx.fillStyle = `rgba(255,150,160,${al * p})`; ctx.font = '12px "Gowun Dodum", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('좌표 · 무한 복제 공장', tx, ty + 40);
+      const ox = 150, oy = 220 + bob;
+      ctx.strokeStyle = `rgba(255,200,220,${al * 0.35})`; ctx.setLineDash([5, 7]); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+      const gy = 150 - (t % 6) * 6;
+      plane(ox + 80, gy, -0.4, Object.assign({}, craftById('c_ace').look, { noShadow: true, scale: 0.9 }), 0.35);
+      plane(ox, oy, 0.9, big(P.look, 1.35));
+    }
+  }
   function drawEnding() {
     const t = ending.t, kind = ending.kind || 'pilot', id = ending.id || P.pilot.id, cr = kind === 'craft' ? craftById(id) : null;
-    const E = kind === 'pilot' ? ENDINGS[id] : cr ? cr.ending : Object.assign({}, FINAL_ENDING, { text: [FINAL_ENDING.text[0]].concat(FINAL_EPILOGUE[PLANES[camp.orig].pilot.id]) }), lead = PLANES[camp.orig];
+    const E = kind === 'pilot' ? ENDINGS[id] : kind === 'epilogue' ? EPILOGUES[id] : cr ? cr.ending : FINAL_ENDING, lead = PLANES[camp.orig];
     const al = Math.min(1, t / 1.2);
     ctx.save();
     ctx.globalAlpha = al;
     const g = ctx.createLinearGradient(0, 0, 0, 460);
     g.addColorStop(0, E.sky[0]); g.addColorStop(0.6, E.sky[1]); g.addColorStop(1, E.sky[2]);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    if (kind === 'pilot') endingScene(id, t, al); else if (cr) craftEndingScene(cr, t, al); else finalEndingScene(t, al);
+    if (kind === 'pilot') part1Scene(id, t, al); else if (kind === 'epilogue') endingScene(id, t, al); else if (cr) craftEndingScene(cr, t, al); else finalEndingScene(t, al);
     ctx.globalAlpha = al;
     for (let row = 0; row < 2; row++) {
       ctx.fillStyle = row ? '#fff8ee' : 'rgba(255,240,228,0.75)';
@@ -3261,7 +3366,7 @@ function makeShooter() {
     if (cr) craftPortrait(cr, 62, 506, 42); else drawPilot(lead.pilot.id, 62, 506, 42, lead.look.accent);
     ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.font = '12px "Gowun Dodum", sans-serif'; ctx.fillStyle = '#ffb36b';
-    ctx.fillText(kind === 'final' ? 'F I N A L   E N D I N G' : cr ? 'E N D I N G · 회수 기체' : 'P A R T 1 · E N D I N G', 120, 474);
+    ctx.fillText(kind === 'final' ? 'F I N A L   E N D I N G' : kind === 'epilogue' ? 'E P I L O G U E' : cr ? 'E N D I N G · 회수 기체' : 'P A R T 1 · E N D I N G', 120, 474);
     ctx.font = '28px "Black Han Sans", sans-serif';
     ctx.fillStyle = '#e0662a'; ctx.fillText(E.title, 120, 493);
     ctx.fillStyle = '#f6ecd9'; ctx.fillText(E.title, 120, 490);
@@ -3283,7 +3388,7 @@ function makeShooter() {
     if (t > 2.5 && Math.floor(t * 2) % 2) {
       ctx.font = '12px "Gowun Dodum", sans-serif'; ctx.fillStyle = 'rgba(246,236,217,0.75)';
       const more = camp.pool.length - 1 + (camp.next < CRAFT_ORDER.length ? 1 : 0) > 0;
-      ctx.fillText('Space · 화면 누르기 ▶ ' + (gallery ? '갤러리로' : kind === 'pilot' ? '2부 회수 작전으로' : cr ? (more ? '격납고로' : '마지막 출격으로') : '무한 모드로'), W / 2, 696);
+      ctx.fillText('Space · 화면 누르기 ▶ ' + (gallery ? '갤러리로' : kind === 'final' ? '에필로그로' : kind === 'epilogue' ? '무한 모드로' : kind === 'pilot' ? '2부 회수 작전으로' : cr ? (more ? '격납고로' : '마지막 출격으로') : '무한 모드로'), W / 2, 696);
     }
     ctx.restore();
   }
@@ -3750,7 +3855,12 @@ function makeShooter() {
     startScene([radioLine(PART2.factoryGone), pilotLine(PART2.lastWord[P.pilot.id])], () => {
       Save.markEnding('final');
       Save.markClear(camp.orig, DIFFS.indexOf(D), continues === 0);
-      ending = { t: 0, kind: 'final', id: 'final', finish: startEndless };
+      const pid = PLANES[camp.orig].pilot.id;
+      ending = { t: 0, kind: 'final', id: 'final', finish: () => {
+        Save.markEnding('epi_' + pid);
+        ending = { t: 0, kind: 'epilogue', id: pid, finish: startEndless };
+        fanfare();
+      } };
       fanfare();
     });
   }
@@ -4407,10 +4517,10 @@ function makeShooter() {
       if (opts && opts.gallery) {
         const g = opts.gallery;
         gallery = true;
-        camp.orig = g.kind === 'pilot' ? g.plane : App.setup.plane;
+        camp.orig = g.kind === 'pilot' || g.kind === 'epilogue' ? g.plane : App.setup.plane;
         P = PLANES[camp.orig];
         player.x = W / 2; player.y = H + 200; player.inv = 999;
-        ending = { t: 0, kind: g.kind, id: g.id, finish: () => App.openGallery() };
+        ending = { t: 0, kind: g.kind, id: g.kind === 'epilogue' ? g.pilot : g.id, finish: () => App.openGallery() };
         return;
       }
       if (opts && opts.attack) {
@@ -4723,6 +4833,7 @@ function makeShooter() {
     continueInfo: () => ({ score, stage: stageNo, used: continues }),
     recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, attack: !!camp.attack, planeId: camp.startPlane || P.id }),
     endings: ENDINGS,
+    epilogues: EPILOGUES,
     isGallery: () => gallery,
     retryOpts() {
       if (camp.attack) return { attack: true };
@@ -4860,7 +4971,7 @@ const App = {
     initAudio();
     hitStop = 0; hurtFx = 0; App.rule = null;
     App.hangar = null;
-    if (!run && !(opts && (opts.attack || opts.gallery))) Save.clearRun();   // the 3-minute mode keeps the saved story run
+    if (!run && !(opts && (opts.attack || opts.gallery))) Save.clearRun(opts && opts.endless ? 'endless' : 'story');   // each mode only clears its own slot
     const g = GAMES[id];
     App.game = g;
     parts = []; shake = 0; flashT = 0; banner.t = 0; drag = null;
@@ -4870,8 +4981,8 @@ const App = {
     syncUI();
   },
   retry() { if (App.game) App.start(App.game.id, null, App.game.retryOpts ? App.game.retryOpts() : undefined); },
-  resume() {
-    const r = Save.run;
+  resume(which) {
+    const r = which === 'endless' ? Save.erun : Save.run;
     if (!r) return;
     App.setup.plane = r.plane; App.setup.diff = r.diff;
     App.start('shooter', r);
@@ -4893,14 +5004,14 @@ const App = {
     const ri = g.recordInfo();
     const nb = ri.attack ? Save.attackRecord(ri.plane, ri.diff, s) : ri.endless ? Save.endlessRecord(ri.planeId, ri.diff, s, ri.nc) : Save.record(ri.plane, ri.diff, s, ri.nc);
     const b = ri.attack ? { all: Save.attackBest(ri.plane, ri.diff) } : ri.endless ? Save.endlessBest(ri.planeId, ri.diff) : Save.best(ri.plane, ri.diff);
-    if (!ri.attack) Save.clearRun();
+    if (!ri.attack) Save.clearRun(ri.endless ? 'endless' : 'story');
     $('overEyebrow').textContent = nb.nc ? '노컨티뉴 신기록' : nb.all ? '새 최고 기록' : g.reason();
     $('overTitle').textContent = ri.attack ? '3분 출격 종료' : '임무 종료';
     $('storyCta').hidden = $('storyCtaBtn').hidden = !ri.attack;
     const rows = g.stats().concat(ri.attack ? [['3분 출격 최고', fmt(b.all)]] : [
       [ri.endless ? '무한 최고 (일반)' : '최고 기록 (일반)', fmt(b.all)],
       [ri.endless ? '무한 최고 (노컨티뉴)' : '최고 기록 (노컨티뉴)', b.nc ? fmt(b.nc) : '없음'],
-      ['엔딩 수집', Save.endingCount() + ' / 12'],
+      ['엔딩 수집', Save.endingCount() + ' / 16'],
     ]);
     if (!ri.nc && !ri.attack) rows.push(['노컨티뉴 기록', '이어하기를 해서 제외']);
     const box = $('overStats');
@@ -4931,7 +5042,7 @@ function syncUI() {
   Music.refresh();
   $('best-shooter').textContent = fmt(Save.topAll());
   $('endCount').textContent = Save.endingCount();
-  const run = Save.run;
+  const run = Save.run, erun = Save.erun;
   $('resumeRunBtn').hidden = !run;
   const openN = endlessChoices().filter(c => c.unlocked).length;
   [0, 1, 2].forEach(i => $('mode' + i).setAttribute('aria-pressed', String(i === App.menuSel)));
@@ -4942,9 +5053,15 @@ function syncUI() {
   $('bestAttack').textContent = fmt(Save.attackTop());
   $('freshBadge').hidden = !App.fresh;
   for (const id of ['vibeBtn', 'vibeMenuBtn']) { $(id).hidden = !canVibe; $(id).textContent = Save.settings.vibe ? '진동 켬' : '진동 끔'; }
-  $('resumeKeyHint').hidden = !run;
+  $('resumeKeyHint').hidden = !(run || erun);
   if (run) $('runInfo').textContent = `${PLANES[run.plane].pilot.name} · ${DIFFS[run.diff].name} · STAGE ${run.stage} · 점수 ${fmt(run.score)}`;
-  $('galleryBtn').textContent = '엔딩 갤러리 ' + Save.endingCount() + '/12';
+  $('resumeEndlessBtn').hidden = !erun;
+  $('menuScr').classList.toggle('two-runs', !!(run && erun));
+  if (erun) {
+    const c = erun.camp || {}, nm = c.craft ? craftById(c.craft).name : PLANES[c.endPlane !== undefined ? c.endPlane : erun.plane].name;
+    $('erunInfo').textContent = `${nm} · ${DIFFS[erun.diff].name} · STAGE ${erun.stage} · 점수 ${fmt(erun.score)}`;
+  }
+  $('galleryBtn').textContent = '엔딩 갤러리 ' + Save.endingCount() + '/16';
   if (m === 'menu' || m === 'hangar' || m === 'gallery') fitMenu();
 }
 
@@ -4958,7 +5075,7 @@ window.addEventListener('keydown', e => {
     if (e.code === 'ArrowUp' || e.code === 'KeyW') App.selMode(App.menuSel - 1);
     if (e.code === 'ArrowDown' || e.code === 'KeyS') App.selMode(App.menuSel + 1);
     if (!e.repeat && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); App.chooseMode(App.menuSel); }
-    if (!e.repeat && e.code === 'KeyR' && Save.run) App.resume();
+    if (!e.repeat && e.code === 'KeyR') { if (App.menuSel === 2 && Save.erun) App.resume('endless'); else if (Save.run) App.resume(); else if (Save.erun) App.resume('endless'); }
     if (!e.repeat && e.code === 'KeyG') App.openGallery();
   } else if (m === 'rule') {
     const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
@@ -5030,6 +5147,7 @@ $('galleryPlay').addEventListener('click', () => App.playGallery());
 $('galleryBack').addEventListener('click', () => App.menu());
 for (const id of ['vibeBtn', 'vibeMenuBtn']) $(id).addEventListener('click', () => { Save.set('vibe', !Save.settings.vibe); buzz(40); syncUI(); });
 $('resumeRunBtn').addEventListener('click', () => App.resume());
+$('resumeEndlessBtn').addEventListener('click', () => App.resume('endless'));
 $('hangarGo').addEventListener('click', () => App.pickHangar());
 $('hangarBack').addEventListener('click', () => App.menu());
 $('hangarStory').addEventListener('click', () => App.openSetup('story'));
@@ -5147,6 +5265,8 @@ function galleryList() {
       who: c.title + ' ' + c.name, tag: '회수 기체 엔딩', line: c.ending.text[0], hint: `2부 회수 작전에서 ${c.name}${c.ga === '가' ? '를' : '을'} 타고 3구간을 마치면 열려요.` })))
     .concat([{ kind: 'final', id: 'final', title: FINAL_ENDING.title, sky: FINAL_ENDING.sky, look: null,
       who: '새벽 편대', tag: '최종 엔딩', line: FINAL_ENDING.text[0], hint: '스토리 모드 최종장(30~33스테이지)에서 복제 공장을 무너뜨리면 열려요.' }])
+    .concat(PLANES.map((p, i) => { const X = GAMES.shooter.epilogues[p.pilot.id]; return { kind: 'epilogue', id: 'epi_' + p.pilot.id, pilot: p.pilot.id, plane: i, title: X.title, sky: X.sky, look: p.look,
+      who: p.pilot.name + ' · ' + p.name, tag: '에필로그', line: X.text[0], hint: `스토리 모드를 ${withRo(p.pilot.name)} 끝까지 마치면, 최종 엔딩 뒤에 열려요.` }; }))
     .map(g => Object.assign(g, { seen: Save.seenEnding(g.id) }));
 }
 function drawGalleryThumb(canvas, g) {
