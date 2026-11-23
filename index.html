@@ -2648,7 +2648,7 @@ function makeShooter() {
     c_beacon: { cd: 2.6, dur: 0.9, dps: 95 },                   // 회전 광선: a wide sweeping beam
     c_cloud: { cd: 1.1, strike: 9 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
     c_fortress: { cd: 0.5, beam: 3.4, guard: 20, rgb: '255,210,120' },  // 방패 위성: lasers, and the satellites block bullets
-    c_ace: { cd: 0.8, mini: 1.15 },                             // 분열 미사일: splits into eleven homing missiles
+    c_ace: { cd: 0.45, zap: 4.6, chain: 2, rgb: '255,236,150' },  // 번개 위성: two satellites strike the nearest foes, and the bolt jumps on
   };
   function shotDir(x, y, a, sp, dmg, style, extra) { return Object.assign({ x, y, vx: Math.sin(a) * sp, vy: -Math.cos(a) * sp, dmg, ang: a, style }, extra || {}); }
   function spawnSplit(b) {
@@ -2714,15 +2714,23 @@ function makeShooter() {
         secFx.push({ kind: 'cloud', x, t: 0, struck: false });
         return T.cd;
       }
-      case 'c_ace':
-        pb.push(shotDir(p.x, p.y - 20, 0, 700, 1.2 * k * d, 'lamp', { split: { t: 0.3, prox: 60, kind: 'missiles', n: 11, dmg: T.mini * k * d, rgb: '255,235,180' } }));
-        return T.cd;
     }
     return 9;
   }
   // laser satellites (swallow, fortress): where they sit, and a flatter power curve so they help early
-  const SATS = { swallow: [[-44, -4], [44, -4]], c_fortress: [[-34, -34], [34, -34]] };
+  const SATS = { swallow: [[-44, -4], [44, -4]], c_fortress: [[-34, -34], [34, -34]], c_ace: [[-40, -24], [40, -24]] };
   function satPos(i) { const p = player, o = SATS[P.id][i]; return [p.x + o[0], p.y + o[1] + Math.sin(time * 3 + i * 2) * 3]; }
+  function fireSatZap(i, dmg, rgb, used) {
+    const [sx, sy] = satPos(i);
+    let from = null, x = sx, y = sy;
+    for (let j = 0; j <= S2.c_ace.chain; j++) {
+      let nx = null, nd = 1e9;
+      for (const e of enemies) { if (e.dead || e.y < -20 || e.y > H || used.has(e) || (e.armored && turretsLeft())) continue; const dd = Math.hypot(e.x - x, e.y - y); if (dd < nd && (!from || dd < 220)) { nd = dd; nx = e; } }
+      if (!nx) break;
+      bolt(x, y, nx.x, nx.y, rgb, j ? 1.1 : 1.5); hitEnemy(nx, dmg * (j ? 0.7 : 1)); spark(nx.x, nx.y, rgb, 6, 160);
+      used.add(nx); from = nx; x = nx.x; y = nx.y;
+    }
+  }
   function fireSatLaser(i, dmg, rgb) {
     const [sx, sy] = satPos(i), side = i ? 1 : -1;
     const tg = P.id === 'swallow' ? (sideTarget(side) || nearestEnemy(sx, sy)) : nearestEnemy(sx, sy);
@@ -2742,7 +2750,11 @@ function makeShooter() {
     if (SATS[P.id]) {
       const T = S2[P.id], kS = 0.95 + 0.05 * p.power;
       secFx.satT = (secFx.satT || 0) - dt;
-      if (secFx.satT <= 0) { secFx.satT = T.cd; secFx.satI = ((secFx.satI || 0) + 1) % 2; fireSatLaser(secFx.satI, T.beam * kS * d, T.rgb); fireSatLaser(1 - secFx.satI, T.beam * kS * d, T.rgb); tone(1700, 0.04, 'sine', 0.015, 2400); }
+      if (secFx.satT <= 0) {
+        secFx.satT = T.cd; secFx.satI = ((secFx.satI || 0) + 1) % 2;
+        if (T.zap) { const used = new Set(); fireSatZap(secFx.satI, T.zap * kS * d, T.rgb, used); fireSatZap(1 - secFx.satI, T.zap * kS * d, T.rgb, used); tone(1300 + Math.random() * 300, 0.06, 'sawtooth', 0.02, 300); }
+        else { fireSatLaser(secFx.satI, T.beam * kS * d, T.rgb); fireSatLaser(1 - secFx.satI, T.beam * kS * d, T.rgb); tone(1700, 0.04, 'sine', 0.015, 2400); }
+      }
       if (T.guard) for (let i = 0; i < 2; i++) { const [sx, sy] = satPos(i); for (const b of eb) if (!b.hit && Math.hypot(b.x - sx, b.y - sy) < T.guard) { b.hit = true; spark(b.x, b.y, T.rgb, 3, 90); } }
     }
     if (P.id === 'owl') {
@@ -2797,7 +2809,8 @@ function makeShooter() {
       const [sx, sy] = satPos(i), rgb = S2[P.id].rgb;
       glowDot(sx, sy, P.id === 'c_fortress' ? 24 : 18, rgb, 0.55);
       ctx.save(); ctx.translate(sx, sy);
-      if (P.id === 'swallow') { ctx.rotate(i ? 0.5 : -0.5); ctx.fillStyle = '#eafff6'; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill(); }
+      if (P.id === 'c_ace') { ctx.rotate(time * 2 * (i ? 1 : -1)); ctx.fillStyle = '#fff8d8'; ctx.beginPath(); for (let j = 0; j < 8; j++) { const r = j % 2 ? 3.5 : 9, an = j / 8 * TAU; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); } ctx.closePath(); ctx.fill(); }
+      else if (P.id === 'swallow') { ctx.rotate(i ? 0.5 : -0.5); ctx.fillStyle = '#eafff6'; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill(); }
       else { ctx.fillStyle = '#fff3d6'; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(8, -4); ctx.lineTo(6, 6); ctx.lineTo(0, 9); ctx.lineTo(-6, 6); ctx.lineTo(-8, -4); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = `rgba(${rgb},0.5)`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, S2.c_fortress.guard, 0, TAU); ctx.stroke(); }
       ctx.restore();
@@ -5457,8 +5470,8 @@ function drawPreview(canvas, plane) {
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
 const SEC2 = { swallow: '깃털 위성', hawk: '급강하 발톱', ox: '충격파', owl: '달빛 위성', c_twin: '해·달 유도탄', c_beacon: '회전 광선',
-  c_cloud: '낙뢰 구름', c_fortress: '방패 위성', c_ace: '분열 미사일', c_dread: '연쇄 번개' };
-const SEC2ROLE = { swallow: '위성', hawk: '집중', ox: '방어', owl: '지원', c_twin: '유도', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '광역', c_dread: '연쇄' };
+  c_cloud: '낙뢰 구름', c_fortress: '방패 위성', c_ace: '번개 위성', c_dread: '연쇄 번개' };
+const SEC2ROLE = { swallow: '위성', hawk: '집중', ox: '방어', owl: '지원', c_twin: '유도', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
 function refitPlane(idx) {
