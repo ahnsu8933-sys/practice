@@ -1218,11 +1218,12 @@ function drawBossNew(e, col, blink, hurt) {
   } else {
     // 먹구름: weather ship buried in its own thundercloud
     if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.28)'; ctx.beginPath(); ctx.ellipse(26, 62, 122, 30, 0, 0, TAU); ctx.fill(); }
-    ctx.strokeStyle = 'rgba(190,210,255,0.45)'; ctx.lineWidth = 1.5;
+    const V = e.craft ? { rain: 'rgba(205,175,255,0.55)', hull: '#3b2a66', shade: '#2e1c5c', puff: '#6b48c8', top: '#9c7cf0' } : null;
+    ctx.strokeStyle = V ? V.rain : 'rgba(190,210,255,0.45)'; ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let i = 0; i < 14; i++) { const x = -92 + i * 14, y = 34 + ((time * 160 + i * 37) % 50); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 12); }
     ctx.stroke();
-    ctx.fillStyle = col('#232836');
+    ctx.fillStyle = V ? (e.flash > 0 ? '#ffffff' : V.hull) : col('#232836');
     rr(-92, 0, 184, 32, 12); ctx.fill();
     ctx.strokeStyle = e.flash > 0 ? '#fff' : '#b08a3a'; ctx.lineWidth = 2.5;
     rr(-92, 0, 184, 32, 12); ctx.stroke();
@@ -1237,11 +1238,11 @@ function drawBossNew(e, col, blink, hurt) {
     ctx.strokeStyle = '#ffd966'; ctx.lineWidth = 1.6;
     ctx.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + time; ctx.moveTo(Math.cos(a) * 8.5, 17 + Math.sin(a) * 8.5); ctx.lineTo(Math.cos(a) * 12, 17 + Math.sin(a) * 12); } ctx.stroke();
     const puffs = [[-70, -8, 30], [-36, -22, 36], [4, -26, 40], [44, -20, 34], [78, -6, 26], [-12, -2, 34], [30, 0, 30]];
-    ctx.fillStyle = col('#211d30');
+    ctx.fillStyle = V ? V.shade : col('#211d30');
     for (const [x, y, r] of puffs) { ctx.beginPath(); ctx.arc(x + 3, y + 7, r, 0, TAU); ctx.fill(); }
-    ctx.fillStyle = col('#3a3552');
+    ctx.fillStyle = V ? (e.flash > 0 ? '#ffffff' : V.puff) : col('#3a3552');
     for (const [x, y, r] of puffs) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }
-    ctx.fillStyle = col('#514a70');
+    ctx.fillStyle = V ? V.top : col('#514a70');
     for (const [x, y, r] of puffs) { ctx.beginPath(); ctx.arc(x - r * 0.25, y - r * 0.3, r * 0.5, 0, TAU); ctx.fill(); }
     if (e.phase2 || Math.random() < 0.12) arcs(0, -12, 56, e.phase2 ? 3 : 1, '200,225,255');
     for (const sx of [-20, 20]) glowDot(sx, -8, 11, '255,50,80', 0.7 + 0.3 * blink);
@@ -2166,7 +2167,7 @@ const CRAFTS = [
   { id: 'c_cloud', type: 'cloud', name: '먹구름', ga: '이', title: '기상 관측선', speed: 300, hp: 6, dmg: 1, hit: 4,
     weapon: 'rain', weaponName: '소나기 연사', bomb: 'thunder', bombName: '벼락 기둥', ult: 'front', ultName: '폭풍 전선',
     story: '기상 관측선. 곧게 뻗는 빗줄기 탄을 여러 줄로 퍼부어 넓은 폭을 한꺼번에 쓸어 낸다.',
-    look: { kind: 'craft', type: 'cloud', art: 0.3, accent: '#9fc6ff', scale: 1 }, stats: [3, 4, 4],
+    look: { kind: 'craft', type: 'cloud', art: 0.3, accent: '#c3a6ff', scale: 1 }, stats: [3, 4, 4],
     ending: { title: '내일은 맑음', sky: ['#4f7fc0', '#9fd0f0', '#fff4dc'], text: [
       '먹구름은 기상 관측선으로 돌아갔다.',
       '매일 아침, 편대에 날씨를 알려 주는 목소리가 다시 들린다.',
