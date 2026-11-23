@@ -2249,7 +2249,7 @@ function makeShooter() {
   const ATTACK_TIME = 180, GRAZE_R = 16;
   const ENTER = { factory: [150, 45], beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
-  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow, gallery, sec2T = 0;
+  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow, gallery, sec2T = 0, secFx = [];
   let bossDuo, attackT, attackEnd, grazes, grazeSfx, survBonus, ruleWind, stormT, clouds;
   const hasRule = id => !!(camp && camp.rules && camp.rules.includes(id));
   const grazeOn = () => !!(camp && (camp.attack || camp.act === 4));
@@ -2627,46 +2627,173 @@ function makeShooter() {
     p.shot++;
     if (P.weapon !== 'cannon' && p.shot % 2 === 0) tone(880 + Math.random() * 60, 0.05, 'square', 0.012, 500);
   }
-  // endless second weapon; returns the cooldown until the next volley
+  // ---- endless second weapons: each one covers what the main weapon misses, and each one is easy to see ----
+  // tuning table (P5 numbers are multiplied by k = 0.8 + 0.1 * power)
+  const S2 = {
+    swallow: { cd: 0.55, carrier: 1, shard: 1.3 },            // 깃털 폭산탄: bursts into a fan of needles
+    hawk: { cd: 0.9, talon: 3.6 },                              // 급강하 발톱: homing strikes on the toughest enemy
+    ox: { cd: 2.2, radius: 200, reach: 580, speed: 700, dmg: 7 },                       // 충격파: hits nearby enemies and wipes nearby bullets
+    owl: { cd: 0.3, shot: 1.3 },                                // 달빛 위성: two moons orbit and shoot
+    c_twin: { cd: 0.5, shard: 1.4 },                            // 일식 폭발탄: two orbs burst into rings at the sides
+    c_beacon: { cd: 2.6, dur: 0.9, dps: 95 },                   // 회전 광선: a wide sweeping beam
+    c_cloud: { cd: 1.1, strike: 9 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
+    c_fortress: { cd: 1.0, boom: 5.5, radius: 80, shard: 1.1 },  // 파편 박격포: explodes and throws shrapnel
+    c_ace: { cd: 0.8, mini: 1.4 },                              // 분열 미사일: splits into six homing missiles
+  };
+  function shotDir(x, y, a, sp, dmg, style, extra) { return Object.assign({ x, y, vx: Math.sin(a) * sp, vy: -Math.cos(a) * sp, dmg, ang: a, style }, extra || {}); }
+  function spawnSplit(b) {
+    const s = b.split;
+    if (s.kind === 'fan') for (let i = 0; i < s.n; i++) { const a = b.ang + (i / (s.n - 1) - 0.5) * s.spread; pb.push(shotDir(b.x, b.y, a, s.sp, s.dmg, s.style, { life: s.life })); }
+    else if (s.kind === 'ring') for (let i = 0; i < s.n; i++) { const a = i / s.n * TAU + rand(0, 0.3); pb.push(shotDir(b.x, b.y, a, s.sp, s.dmg, s.style, { life: s.life })); }
+    else if (s.kind === 'missiles') {
+      const list = enemies.filter(e => !e.dead && e.y > -20 && e.y < H).sort((p, q) => Math.hypot(p.x - b.x, p.y - b.y) - Math.hypot(q.x - b.x, q.y - b.y));
+      for (let i = 0; i < s.n; i++) pb.push({ x: b.x, y: b.y, h: -Math.PI / 2 + (i / (s.n - 1) - 0.5) * 2.4, vx: 0, vy: 0, ang: 0, dmg: s.dmg, homing: true, life: 1.6, target: list.length ? list[i % list.length] : null });
+    }
+    if (s.boom) {
+      for (const e of enemies.slice()) if (!e.dead && Math.hypot(e.x - b.x, e.y - b.y) < s.boom + (e.hw || e.r || 16)) hitEnemy(e, s.boomDmg);
+      pop(b.x, b.y, 1.5);
+      parts.push({ kind: 'ring', x: b.x, y: b.y, life: 0.35, max: 0.35, size: s.boom, color: '255,190,120' });
+    }
+    parts.push({ kind: 'ring', x: b.x, y: b.y, life: 0.25, max: 0.25, size: 34, color: s.rgb || '255,230,180' });
+    spark(b.x, b.y, s.rgb || '255,230,180', 6, 160);
+  }
+  const visibleFoes = () => enemies.filter(e => !e.dead && e.y > -10 && e.y < H - 60 && !(e.armored && turretsLeft()));
+  const aimTo = (x, y, e) => Math.atan2(e.x - x, -(e.y - y));
+  function sideTarget(side) {
+    const p = player; let best = null, bv = -1;
+    for (const e of visibleFoes()) { const dx = (e.x - p.x) * side; if (dx < -20) continue; const v = dx + (p.y - e.y) * 0.2; if (v > bv) { bv = v; best = e; } }
+    return best;
+  }
+  function densest() {
+    const L = visibleFoes(); let best = null, bn = -1;
+    for (const e of L) { let n = 0; for (const o of L) if (Math.hypot(o.x - e.x, o.y - e.y) < 110) n++; if (n > bn) { bn = n; best = e; } }
+    return best;
+  }
+  function toughest() {
+    let best = null, bh = -1;
+    for (const e of enemies) { if (e.dead || e.y < -20 || e.y > H || (e.armored && turretsLeft())) continue; const h = e.hp + (e.isBoss ? 1e5 : 0); if (h > bh) { bh = h; best = e; } }
+    return best;
+  }
   function fire2() {
-    const p = player, lv = p.power, k = 0.8 + 0.1 * lv;
-    const M = (x, y, h, dmg) => pb.push({ x, y, h, vx: 0, vy: 0, ang: 0, dmg: dmg * P.dmg, homing: true, life: 2 });
+    const p = player, k = 0.8 + 0.1 * p.power, d = P.dmg, T = S2[P.id];
     switch (P.id) {
-      case 'swallow':   // 칼날 깃: two piercing needles thrown out sideways from the wings
-        for (const sd of [-1, 1]) { const a = sd * 0.16; pb.push({ x: p.x + sd * 16, y: p.y - 10, vx: Math.sin(a) * 900, vy: -Math.cos(a) * 900, dmg: 1.5 * k * P.dmg, ang: a, style: 'needle', pierce: 2, hits: new Set() }); }
-        return 0.28;
-      case 'hawk':      // 화염탄: two fire shells that burst on impact
-        for (const sd of [-1, 1]) { const a = sd * 0.14; pb.push({ x: p.x + sd * 12, y: p.y - 18, vx: Math.sin(a) * 560, vy: -Math.cos(a) * 560, dmg: 2.4 * k * P.dmg, ang: a, style: 'shell', big: false, splash: 42 }); }
-        return 0.6;
-      case 'ox':        // 돌진 산탄: a short-range blast of pellets
-        for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 1.1; pb.push({ x: p.x, y: p.y - 20, vx: Math.sin(a) * 700, vy: -Math.cos(a) * 700, dmg: 1.2 * k * P.dmg, ang: a, life: 0.62, style: 'orb' }); }
-        return 0.45;
-      case 'owl': {     // 달빛 초승달: a slow moonlight crescent that cuts through three enemies
+      case 'swallow':
         p.sideM = -(p.sideM || 1);
-        const a = p.sideM * 0.05;
-        pb.push({ x: p.x, y: p.y - 26, vx: Math.sin(a) * 620, vy: -Math.cos(a) * 620, dmg: 3.0 * k * P.dmg, ang: a, style: 'cyan', pierce: 3, hits: new Set() });
-        return 0.5;
+        { const tg = sideTarget(p.sideM); const a0 = tg ? Math.max(-1.1, Math.min(1.1, aimTo(p.x, p.y - 26, tg))) : p.sideM * 0.2;
+        pb.push(shotDir(p.x, p.y - 26, a0, 640, T.carrier * k * d, 'needle', { big: true, split: { t: 0.42, prox: 80, kind: 'fan', n: 9, spread: 2.0, sp: 760, dmg: T.shard * k * d, style: 'needle', life: 0.5, rgb: '200,230,255' } })); }
+        tone(1400, 0.05, 'triangle', 0.02, 2000);
+        return T.cd;
+      case 'hawk': {
+        const tg = toughest();
+        for (const sd of [-1, 1]) pb.push({ x: p.x + sd * 20, y: p.y, h: -Math.PI / 2 + sd * 0.8, vx: 0, vy: 0, ang: 0, dmg: T.talon * k * d, homing: true, life: 2.4, target: tg, talon: true });
+        return T.cd;
       }
-      case 'c_twin':    // 해·달 궤도탄: a sun shot and a moon shot that cross in front
-        for (const sd of [-1, 1]) { const a = -sd * 0.22; pb.push({ x: p.x + sd * 40, y: p.y - 6, vx: Math.sin(a) * 760, vy: -Math.cos(a) * 760, dmg: 2.0 * k * P.dmg, ang: a, style: sd < 0 ? 'orb' : 'cyan' }); }
-        return 0.4;
-      case 'c_beacon':  // 탐조 광선: a long beam bolt that goes through everything in its line
-        pb.push({ x: p.x, y: p.y - 30, vx: 0, vy: -1300, dmg: 3.2 * k * P.dmg, ang: 0, style: 'lamp', pierce: 99, hits: new Set() });
-        return 0.7;
-      case 'c_cloud': { // 우박: hail falls from the top of the screen onto the enemies below
-        const list = enemies.filter(e => !e.dead && e.y > 0 && e.y < H * 0.75);
-        for (let i = 0; i < 3; i++) { const t = list.length ? list[Math.floor(Math.random() * list.length)] : null; const x = t ? t.x + rand(-20, 20) : rand(30, W - 30); pb.push({ x, y: -10, vx: 0, vy: 640, dmg: 2.2 * k * P.dmg, ang: Math.PI, style: 'drop' }); }
-        return 0.6;
+      case 'ox': {
+        secFx.push({ kind: 'shock', x: p.x, y: p.y, r: 20, t: 0, hit: new Set() });
+        parts.push({ kind: 'ring', x: p.x, y: p.y, life: 0.3, max: 0.3, size: 60, color: '255,240,200' });
+        shake = Math.max(shake, 0.2); boom(0.3, 0.12, 400);
+        return T.cd;
       }
-      case 'c_fortress': // 방패 박격포: one slow heavy shell with a wide burst
-        pb.push({ x: p.x, y: p.y - 24, vx: 0, vy: -480, dmg: 3.4 * k * P.dmg, ang: 0, style: 'shell', big: true, splash: 52 });
-        return 0.9;
-      case 'c_ace':     // 비행운 미사일: a homing missile from alternating wings
-        p.sideM = -(p.sideM || 1);
-        M(p.x + p.sideM * 18, p.y, -Math.PI / 2 + p.sideM * 0.6, 2.4 * k);
-        return 0.42;
+      case 'c_twin':
+        for (const sd of [-1, 1]) pb.push(shotDir(p.x + sd * 30, p.y - 10, (() => { const tg = sideTarget(sd); return tg ? Math.max(-1.2, Math.min(1.2, aimTo(p.x + sd * 30, p.y - 10, tg))) : sd * 0.4; })(), 600, 1.2 * k * d, sd < 0 ? 'orb' : 'cyan', { split: { t: 0.9, prox: 50, kind: 'ring', n: 10, sp: 520, dmg: T.shard * k * d, style: sd < 0 ? 'orb' : 'cyan', life: 0.7, rgb: sd < 0 ? '255,190,110' : '140,210,255' } }));
+        return T.cd;
+      case 'c_beacon':
+        secFx.push({ kind: 'sweep', t: 0, dur: T.dur, dir: (secFx.sweepDir = -(secFx.sweepDir || 1)) });
+        tone(900, 0.6, 'sine', 0.03, 1500);
+        return T.cd;
+      case 'c_cloud': {
+        const list = enemies.filter(e => !e.dead && e.y > 20 && e.y < H * 0.75);
+        const tg = list.length ? list[Math.floor(Math.random() * list.length)] : null;
+        const x = tg ? tg.x : rand(60, W - 60);
+        secFx.push({ kind: 'cloud', x, t: 0, struck: false });
+        return T.cd;
+      }
+      case 'c_fortress':
+        { const tg = densest(); pb.push(shotDir(p.x, p.y - 24, tg ? Math.max(-1.2, Math.min(1.2, aimTo(p.x, p.y - 24, tg))) : 0, 560, 1.5 * k * d, 'shell', { big: true, split: { t: 1.0, prox: 40, kind: 'ring', n: 10, sp: 520, dmg: T.shard * k * d, style: 'orb', life: 0.55, boom: T.radius, boomDmg: T.boom * k * d, rgb: '255,200,130' } })); }
+        tone(140, 0.12, 'square', 0.03, 70);
+        return T.cd;
+      case 'c_ace':
+        pb.push(shotDir(p.x, p.y - 20, 0, 700, 1.2 * k * d, 'lamp', { split: { t: 0.3, prox: 60, kind: 'missiles', n: 6, dmg: T.mini * k * d, rgb: '255,235,180' } }));
+        return T.cd;
     }
     return 1;
+  }
+  // per-frame parts of the second weapons: owl moons, the beacon sweep, storm clouds
+  function updateSec(dt) {
+    const p = player, k = 0.8 + 0.1 * p.power, d = P.dmg;
+    if (P.id === 'owl') {
+      secFx.satT = (secFx.satT || 0) - dt;
+      if (secFx.satT <= 0) {
+        secFx.satT = S2.owl.cd;
+        for (let i = 0; i < 2; i++) {
+          const a = time * 2.2 + i * Math.PI, sx = p.x + Math.cos(a) * 46, sy = p.y + Math.sin(a) * 26;
+          const tg = nearestEnemy(sx, sy);
+          const ang = tg ? Math.atan2(tg.x - sx, -(tg.y - sy)) : 0;
+          pb.push(shotDir(sx, sy, ang, 820, S2.owl.shot * k * d, 'cyan'));
+        }
+      }
+    }
+    for (const f of secFx) {
+      f.t += dt;
+      if (f.kind === 'sweep') {
+        const base = -Math.PI / 2, a = base + f.dir * (-1.25 + 2.5 * Math.min(1, f.t / f.dur));
+        f.a = a;
+        const cx = Math.cos(a), cy = Math.sin(a);
+        for (const e of enemies) {
+          if (e.dead) continue;
+          const rx = e.x - p.x, ry = e.y - p.y, along = rx * cx + ry * cy;
+          if (along < 0 || along > 720) continue;
+          if (Math.abs(rx * cy - ry * cx) < (e.hw || e.r || 16) + 14) { hitEnemy(e, S2.c_beacon.dps * k * d * dt); if (Math.random() < 0.3) spark(e.x, e.y, '255,240,170', 2, 120); }
+        }
+      } else if (f.kind === 'shock') {
+        f.r += S2.ox.speed * dt;
+        for (const e of enemies.slice()) {
+          if (e.dead || f.hit.has(e)) continue;
+          if (Math.abs(Math.hypot(e.x - f.x, e.y - f.y) - f.r) < (e.hw || e.r || 16) + 14) { f.hit.add(e); hitEnemy(e, S2.ox.dmg * k * d); spark(e.x, e.y, '255,220,150', 6, 180); }
+        }
+        if (f.r < S2.ox.radius) for (const b of eb) if (!b.hit && Math.hypot(b.x - f.x, b.y - f.y) < f.r) { b.hit = true; spark(b.x, b.y, '255,220,150', 2, 80); }
+      } else if (f.kind === 'cloud' && !f.struck && f.t > 0.45) {
+        f.struck = true;
+        vbeam(f.x, 30, 0.3, '190,210,255');
+        bolt(f.x + rand(-10, 10), 80, f.x, H, '230,240,255', 1.6);
+        for (const e of enemies.slice()) if (!e.dead && Math.abs(e.x - f.x) < (e.hw || e.r || 16) + 22 && e.y > 60) { hitEnemy(e, S2.c_cloud.strike * k * d); spark(e.x, e.y, '200,225,255', 8, 200); }
+        tone(1300 + Math.random() * 400, 0.08, 'sawtooth', 0.03, 200);
+      }
+    }
+    for (let i = secFx.length - 1; i >= 0; i--) { const f = secFx[i]; if ((f.kind === 'sweep' && f.t > f.dur) || (f.kind === 'cloud' && f.t > 0.9) || (f.kind === 'shock' && f.r > S2.ox.reach)) secFx.splice(i, 1); }
+  }
+  function drawSec() {
+    const p = player;
+    if (P.id === 'owl') for (let i = 0; i < 2; i++) {
+      const a = time * 2.2 + i * Math.PI, sx = p.x + Math.cos(a) * 46, sy = p.y + Math.sin(a) * 26;
+      glowDot(sx, sy, 18, '170,210,255', 0.5);
+      ctx.fillStyle = '#eef6ff'; ctx.beginPath(); ctx.arc(sx, sy, 7, 0, TAU); ctx.arc(sx + 3, sy - 2, 6, 0, TAU, true); ctx.fill('evenodd');
+    }
+    for (const f of secFx) {
+      if (f.kind === 'sweep' && f.a !== undefined) {
+        const al = Math.min(1, (f.dur - f.t) * 5, f.t * 8);
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(f.a);
+        const g = ctx.createLinearGradient(0, 0, 720, 0);
+        g.addColorStop(0, `rgba(255,240,170,${0.85 * al})`); g.addColorStop(1, 'rgba(255,240,170,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(10, -6); ctx.lineTo(720, -30); ctx.lineTo(720, 30); ctx.lineTo(10, 6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = `rgba(255,255,255,${0.9 * al})`; ctx.fillRect(10, -2, 600, 4);
+        ctx.restore();
+        glowDot(p.x, p.y - 10, 30, '255,240,170', 0.6 * al);
+      } else if (f.kind === 'shock') {
+        const al = Math.max(0, 1 - f.r / S2.ox.reach);
+        ctx.strokeStyle = `rgba(255,210,140,${0.7 * al})`; ctx.lineWidth = 10 * al + 2;
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, TAU); ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${0.8 * al})`; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.r - 5, 0, TAU); ctx.stroke();
+      } else if (f.kind === 'cloud') {
+        const al = Math.min(1, f.t * 6, (0.9 - f.t) * 4), fl = !f.struck && Math.sin(time * 40) > 0 ? 0.35 : 0;
+        ctx.fillStyle = `rgba(120,132,175,${0.85 * al})`;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) ctx.ellipse(f.x - 30 + i * 20, 70 + (i % 2) * 5, 18, 13, 0, 0, TAU);
+        ctx.fill();
+        if (fl) glowDot(f.x, 72, 40, '200,220,255', fl);
+      }
+    }
   }
   function nearestEnemy(x, y) {
     let best = null, bd = Infinity;
@@ -4332,7 +4459,7 @@ function makeShooter() {
     windNow = 0;
     for (const b of pb) {
       if (b.homing) {
-        const tgt = nearestEnemy(b.x, b.y);
+        const tgt = b.target && !b.target.dead ? b.target : nearestEnemy(b.x, b.y);
         if (tgt) {
           let da = Math.atan2(tgt.y - b.y, tgt.x - b.x) - b.h;
           da = Math.atan2(Math.sin(da), Math.cos(da));
@@ -4343,6 +4470,12 @@ function makeShooter() {
       if (b.life !== undefined) b.life -= dt;
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.wob) { b.age += dt; b.x = b.x0 + Math.sin(b.age * 10 + b.ph) * b.wob; }
+      if (b.split && !b.hit) {
+        b.split.t -= dt;
+        let go = b.split.t <= 0;
+        if (!go && b.split.prox) for (const e of enemies) if (!e.dead && Math.hypot(e.x - b.x, e.y - b.y) < (e.hw || e.r || 16) + b.split.prox) { go = true; break; }
+        if (go) { b.hit = true; spawnSplit(b); }
+      }
     }
     pb = pb.filter(b => b.y > -20 && b.y < H + 20 && b.x > -20 && b.x < W + 20 && !b.hit && (b.life === undefined || b.life > 0));
 
@@ -4588,7 +4721,7 @@ function makeShooter() {
       bossKind = BOSS_ORDER[0]; ult = null; ultReady = true; ending = null;
       camp = { act: 1, orig: PLANES.indexOf(P), pool: CRAFT_ORDER.slice(0, 3), next: 3, done: [], craft: null, chStage: -1, chapter: 0 };
       finale = null; freezeT = 0; shieldT = 0; droneT = 0; boltT = 0; bossShadow = false;
-      gallery = false; bossDuo = null; attackT = 0; attackEnd = 0; grazes = 0; grazeSfx = 0; survBonus = 0; ruleWind = 0; stormT = 4; clouds = null;
+      gallery = false; secFx = []; sec2T = 0; bossDuo = null; attackT = 0; attackEnd = 0; grazes = 0; grazeSfx = 0; survBonus = 0; ruleWind = 0; stormT = 4; clouds = null;
       stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false;
       setSky(0);
       if (opts && opts.endless) {
@@ -4723,17 +4856,23 @@ function makeShooter() {
           boltT = Math.max(0.3, 0.55 - 0.05 * p.power) * (E4 ? 0.85 : 1);
           const tg = nearestEnemy(p.x, p.y);
           if (tg) {
-            bolt(p.x, p.y - 20, tg.x, tg.y, '190,150,255', E4 ? 1.5 : 1); hitEnemy(tg, (6 + p.power) * P.dmg * (E4 ? 1.35 : 1)); spark(tg.x, tg.y, '210,190,255', E4 ? 10 : 6, 180);
+            bolt(p.x, p.y - 20, tg.x, tg.y, '190,150,255', E4 ? 1.5 : 1); hitEnemy(tg, (6 + p.power) * P.dmg * (E4 ? 1.25 : 1)); spark(tg.x, tg.y, '210,190,255', E4 ? 10 : 6, 180);
             if (E4) {
               // strengthened: the bolt jumps on to the next enemy
-              let nx = null, nd = 1e9;
-              for (const o of enemies) { if (o === tg || o.dead || o.y < -20 || (o.armored && turretsLeft())) continue; const d = Math.hypot(o.x - tg.x, o.y - tg.y); if (d < nd && d < 260) { nd = d; nx = o; } }
-              if (nx) { bolt(tg.x, tg.y, nx.x, nx.y, '220,190,255', 1.2); hitEnemy(nx, (6 + p.power) * P.dmg); spark(nx.x, nx.y, '220,200,255', 6, 160); }
+              let from = tg; const done = new Set([tg]);
+              for (let j = 0; j < 2; j++) {
+                let nx = null, nd = 1e9;
+                for (const o of enemies) { if (done.has(o) || o.dead || o.y < -20 || (o.armored && turretsLeft())) continue; const d = Math.hypot(o.x - from.x, o.y - from.y); if (d < nd && d < 260) { nd = d; nx = o; } }
+                if (!nx) break;
+                bolt(from.x, from.y, nx.x, nx.y, '220,190,255', 1.2); hitEnemy(nx, (6 + p.power) * P.dmg * (j ? 0.8 : 1)); spark(nx.x, nx.y, '220,200,255', 6, 160);
+                done.add(nx); from = nx;
+              }
             }
           }
         }
       }
-      if (camp.act === 4 && SEC2[P.id] && P.id !== 'c_dread' && p.sub !== 'L') { sec2T -= dt; if (sec2T <= 0) sec2T = fire2(); }
+      if (camp.act === 4 && SEC2[P.id] && P.id !== 'c_dread') { sec2T -= dt; if (sec2T <= 0) sec2T = fire2(); updateSec(dt); }
+      else if (secFx.length) secFx.length = 0;
       if (freezeT > 0) freezeT -= dt;
       if (shieldT > 0) shieldT -= dt;
 
@@ -4831,6 +4970,7 @@ function makeShooter() {
         ctx.fillText(dir > 0 ? '바람 ▶▶' : '◀◀ 바람', W / 2, 112);
       }
       if (player.sub === 'L' && !player.dead) drawLaser();
+      if (camp.act === 4 && !player.dead) drawSec();
       drawPlayerBullets(pb);
       if (ult) drawUlt();
       if (!player.dead) {
@@ -4890,11 +5030,14 @@ function makeShooter() {
       }
       pips(bx + 38, by + 19, 5, player.power, '#ff8a3d');
       dots(bx + 47, by + 41, 5, player.bombs, '#8f7bff');
-      label(weaponName() + (camp.act === 4 && SEC2[P.id] && !player.sub ? ' + ' + SEC2[P.id] : ''), bx + 38, by + 54, player.sub ? '#f6ecd9' : '#ffd3a8');
+      const sec = camp.act === 4 && SEC2[P.id];
+      label(weaponName() + (sec ? ' + ' + SEC2[P.id] : ''), bx + 38, by + 54, player.sub ? '#f6ecd9' : '#ffd3a8');
       if (player.sub) {
         const colr = ITEM_STYLE[player.sub][0];
-        ctx.fillStyle = 'rgba(255,255,255,0.15)'; rr(bx + 92, by + 56, 62, 8, 4); ctx.fill();
-        ctx.fillStyle = colr; rr(bx + 92, by + 56, 62 * Math.max(0, player.subT / SUB_DUR), 8, 4); ctx.fill();
+        // with a second weapon the name is longer, so the item timer moves to a thin bar under it
+        const [tx, ty, tw, th] = sec ? [bx + 38, by + 66, 120, 3] : [bx + 92, by + 56, 62, 8];
+        ctx.fillStyle = 'rgba(255,255,255,0.15)'; rr(tx, ty, tw, th, th / 2); ctx.fill();
+        ctx.fillStyle = colr; rr(tx, ty, tw * Math.max(0, player.subT / SUB_DUR), th, th / 2); ctx.fill();
       }
       const bp = bossParts();
       if (bp.length) {
@@ -5274,8 +5417,9 @@ function drawPreview(canvas, plane) {
 }
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
-const SEC2 = { swallow: '칼날 깃', hawk: '화염탄', ox: '돌진 산탄', owl: '달빛 초승달', c_twin: '해·달 궤도탄', c_beacon: '탐조 광선',
-  c_cloud: '우박', c_fortress: '방패 박격포', c_ace: '비행운 미사일', c_dread: '강화 번개' };
+const SEC2 = { swallow: '깃털 폭산탄', hawk: '급강하 발톱', ox: '충격파', owl: '달빛 위성', c_twin: '일식 폭발탄', c_beacon: '회전 광선',
+  c_cloud: '낙뢰 구름', c_fortress: '파편 박격포', c_ace: '분열 미사일', c_dread: '연쇄 번개' };
+const SEC2ROLE = { swallow: '광역', hawk: '집중', ox: '방어', owl: '지원', c_twin: '광역', c_beacon: '광역', c_cloud: '광역', c_fortress: '광역', c_ace: '광역', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
 function refitPlane(idx) {
@@ -5325,7 +5469,7 @@ function renderHangar() {
   } else {
     add('pi-name', `${c.title} ${c.name}`);
     add('pi-story desc', c.story);
-    add('pi-kit', `무기 ${c.weaponName}${E && SEC2[c.id] ? ' + ' + SEC2[c.id] : ''} · 폭탄 ${c.bombName} · 필살기 ${c.ultName}`);
+    add('pi-kit', `무기 ${c.weaponName}${E && SEC2[c.id] ? ' + ' + SEC2[c.id] + ' (' + SEC2ROLE[c.id] + ')' : ''} · 폭탄 ${c.bombName} · 필살기 ${c.ultName}`);
     if (E) { const b = Save.endlessBest(c.id, App.setup.diff); add('pi-rec', `무한 최고 ${fmt(b.all)} · 노컨티뉴 ${b.nc ? fmt(b.nc) : '없음'}`); }
     const stat = add('pstat', '');
     ['속도', '내구', '화력'].forEach((lab, k) => {
