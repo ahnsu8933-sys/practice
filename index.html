@@ -2757,8 +2757,8 @@ function makeShooter() {
   // per-frame parts of the second weapons: owl moons, the beacon sweep, storm clouds
   function updateSec(dt) {
     const p = player, k = 0.8 + 0.1 * p.power, d = P.dmg;
-    // 해와 달 and 올빼미 carry the same shockwave as 황소, on the same timing
-    if (P.id === 'c_twin' || P.id === 'owl') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p); } }
+    // 해와 달, 올빼미 and 제비 carry the same shockwave as 황소, on the same timing
+    if (P.id === 'c_twin' || P.id === 'owl' || P.id === 'swallow') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p); } }
     if (P.id === 'ox') {
       secFx.tpT = (secFx.tpT === undefined ? 0.6 : secFx.tpT) - dt;
       if (secFx.tpT <= 0) {
@@ -5505,9 +5505,9 @@ function drawPreview(canvas, plane) {
 }
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
-const SEC2 = { swallow: '깃털 위성', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성·충격파', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
+const SEC2 = { swallow: '깃털 위성·충격파', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성·충격파', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
   c_cloud: '낙뢰 구름', c_fortress: '방패 위성', c_ace: '번개 위성', c_dread: '연쇄 번개' };
-const SEC2ROLE = { swallow: '위성', hawk: '위성·유도', ox: '방어·폭탄', owl: '지원·방어', c_twin: '유도·방어', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
+const SEC2ROLE = { swallow: '위성·방어', hawk: '위성·유도', ox: '방어·폭탄', owl: '지원·방어', c_twin: '유도·방어', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
 function refitPlane(idx) {
