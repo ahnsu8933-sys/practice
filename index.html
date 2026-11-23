@@ -2249,7 +2249,7 @@ function makeShooter() {
   const ATTACK_TIME = 180, GRAZE_R = 16;
   const ENTER = { factory: [150, 45], beacon: [150, 60], cloud: [140, 60], whale: [150, 60], nest: [140, 60], boss: [140, 70], ace: [150, 200], dread: [130, 50] };
   let score, kills, stageNo, stageTime, spawnT, bossSpawned, clearT, deathT, continues, bossKind, missileT, owlT, laserSfx;
-  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow, gallery;
+  let player, pb, eb, enemies, items, beams, anchor, P, D, timers, scene, introShown, slowT, pendingAfter, ult, ultReady, ending, bossItemT, escortT, heavyT, camp, finale, freezeT, shieldT, droneT, boltT, bossShadow, gallery, sec2T = 0;
   let bossDuo, attackT, attackEnd, grazes, grazeSfx, survBonus, ruleWind, stormT, clouds;
   const hasRule = id => !!(camp && camp.rules && camp.rules.includes(id));
   const grazeOn = () => !!(camp && (camp.attack || camp.act === 4));
@@ -2626,6 +2626,47 @@ function makeShooter() {
     }
     p.shot++;
     if (P.weapon !== 'cannon' && p.shot % 2 === 0) tone(880 + Math.random() * 60, 0.05, 'square', 0.012, 500);
+  }
+  // endless second weapon; returns the cooldown until the next volley
+  function fire2() {
+    const p = player, lv = p.power, k = 0.8 + 0.1 * lv;
+    const M = (x, y, h, dmg) => pb.push({ x, y, h, vx: 0, vy: 0, ang: 0, dmg: dmg * P.dmg, homing: true, life: 2 });
+    switch (P.id) {
+      case 'swallow':   // 칼날 깃: two piercing needles thrown out sideways from the wings
+        for (const sd of [-1, 1]) { const a = sd * 0.16; pb.push({ x: p.x + sd * 16, y: p.y - 10, vx: Math.sin(a) * 900, vy: -Math.cos(a) * 900, dmg: 1.5 * k * P.dmg, ang: a, style: 'needle', pierce: 2, hits: new Set() }); }
+        return 0.28;
+      case 'hawk':      // 화염탄: two fire shells that burst on impact
+        for (const sd of [-1, 1]) { const a = sd * 0.14; pb.push({ x: p.x + sd * 12, y: p.y - 18, vx: Math.sin(a) * 560, vy: -Math.cos(a) * 560, dmg: 2.4 * k * P.dmg, ang: a, style: 'shell', big: false, splash: 42 }); }
+        return 0.6;
+      case 'ox':        // 돌진 산탄: a short-range blast of pellets
+        for (let i = 0; i < 7; i++) { const a = (i / 6 - 0.5) * 1.1; pb.push({ x: p.x, y: p.y - 20, vx: Math.sin(a) * 700, vy: -Math.cos(a) * 700, dmg: 1.2 * k * P.dmg, ang: a, life: 0.62, style: 'orb' }); }
+        return 0.45;
+      case 'owl': {     // 달빛 초승달: a slow moonlight crescent that cuts through three enemies
+        p.sideM = -(p.sideM || 1);
+        const a = p.sideM * 0.05;
+        pb.push({ x: p.x, y: p.y - 26, vx: Math.sin(a) * 620, vy: -Math.cos(a) * 620, dmg: 3.0 * k * P.dmg, ang: a, style: 'cyan', pierce: 3, hits: new Set() });
+        return 0.5;
+      }
+      case 'c_twin':    // 해·달 궤도탄: a sun shot and a moon shot that cross in front
+        for (const sd of [-1, 1]) { const a = -sd * 0.22; pb.push({ x: p.x + sd * 40, y: p.y - 6, vx: Math.sin(a) * 760, vy: -Math.cos(a) * 760, dmg: 2.0 * k * P.dmg, ang: a, style: sd < 0 ? 'orb' : 'cyan' }); }
+        return 0.4;
+      case 'c_beacon':  // 탐조 광선: a long beam bolt that goes through everything in its line
+        pb.push({ x: p.x, y: p.y - 30, vx: 0, vy: -1300, dmg: 3.2 * k * P.dmg, ang: 0, style: 'lamp', pierce: 99, hits: new Set() });
+        return 0.7;
+      case 'c_cloud': { // 우박: hail falls from the top of the screen onto the enemies below
+        const list = enemies.filter(e => !e.dead && e.y > 0 && e.y < H * 0.75);
+        for (let i = 0; i < 3; i++) { const t = list.length ? list[Math.floor(Math.random() * list.length)] : null; const x = t ? t.x + rand(-20, 20) : rand(30, W - 30); pb.push({ x, y: -10, vx: 0, vy: 640, dmg: 2.2 * k * P.dmg, ang: Math.PI, style: 'drop' }); }
+        return 0.6;
+      }
+      case 'c_fortress': // 방패 박격포: one slow heavy shell with a wide burst
+        pb.push({ x: p.x, y: p.y - 24, vx: 0, vy: -480, dmg: 3.4 * k * P.dmg, ang: 0, style: 'shell', big: true, splash: 52 });
+        return 0.9;
+      case 'c_ace':     // 비행운 미사일: a homing missile from alternating wings
+        p.sideM = -(p.sideM || 1);
+        M(p.x + p.sideM * 18, p.y, -Math.PI / 2 + p.sideM * 0.6, 2.4 * k);
+        return 0.42;
+    }
+    return 1;
   }
   function nearestEnemy(x, y) {
     let best = null, bd = Infinity;
@@ -3767,7 +3808,7 @@ function makeShooter() {
     if (ch.craft) { camp.craft = ch.id; setPlane(craftById(ch.id)); }
     else { camp.craft = null; camp.endPlane = ch.orig; setPlane(refitPlane(ch.orig)); }
     player.hp = Math.max(1, Math.ceil(player.maxHp * ratio)); player.power = power; player.bombs = bombs;
-    later(2.6, () => floatText(player.x, player.y - 50, '기체 교대 · ' + P.name, '220,235,255'));
+    later(2.6, () => floatText(player.x, player.y - 50, '기체 교대 · ' + P.name + (SEC2[P.id] ? ' · 보조 ' + SEC2[P.id] : ''), '220,235,255'));
   }
   const finalPlane = () => refitPlane(camp.endPlane !== undefined ? camp.endPlane : camp.orig);
   function setPlane(def) {
@@ -3917,6 +3958,7 @@ function makeShooter() {
     player.power = Math.max(player.power, 3); player.bombs = Math.max(player.bombs, D.bombs);
     clearT = 2.8; player.inv = 2;
     showBanner('무한 모드', '모의 전투 훈련 · ' + P.name, 2.8);
+    if (SEC2[P.id]) later(3, () => floatText(player.x, player.y - 50, '보조 무기 · ' + SEC2[P.id], '255,220,160'));
     fanfare();
     saveRun();   // save the endless state now, so reopening does not replay the final boss
   }
@@ -4558,6 +4600,7 @@ function makeShooter() {
         stageNo = 33;   // the menu run starts where the story ends: stage 34
         nextStage();
         later(2.6, () => floatText(player.x, player.y - 50, '모의 전투 훈련 · ' + P.name, '220,235,255'));
+        if (SEC2[P.id]) later(3.6, () => floatText(player.x, player.y - 50, '보조 무기 · ' + SEC2[P.id], '255,220,160'));
         return;
       }
       if (opts && opts.gallery) {
@@ -4676,11 +4719,21 @@ function makeShooter() {
       if (P.weapon === 'storm') {
         boltT -= dt;
         if (boltT <= 0) {
-          boltT = Math.max(0.3, 0.55 - 0.05 * p.power);
+          const E4 = camp.act === 4;
+          boltT = Math.max(0.3, 0.55 - 0.05 * p.power) * (E4 ? 0.85 : 1);
           const tg = nearestEnemy(p.x, p.y);
-          if (tg) { bolt(p.x, p.y - 20, tg.x, tg.y, '190,150,255'); hitEnemy(tg, (6 + p.power) * P.dmg); spark(tg.x, tg.y, '210,190,255', 6, 180); }
+          if (tg) {
+            bolt(p.x, p.y - 20, tg.x, tg.y, '190,150,255', E4 ? 1.5 : 1); hitEnemy(tg, (6 + p.power) * P.dmg * (E4 ? 1.35 : 1)); spark(tg.x, tg.y, '210,190,255', E4 ? 10 : 6, 180);
+            if (E4) {
+              // strengthened: the bolt jumps on to the next enemy
+              let nx = null, nd = 1e9;
+              for (const o of enemies) { if (o === tg || o.dead || o.y < -20 || (o.armored && turretsLeft())) continue; const d = Math.hypot(o.x - tg.x, o.y - tg.y); if (d < nd && d < 260) { nd = d; nx = o; } }
+              if (nx) { bolt(tg.x, tg.y, nx.x, nx.y, '220,190,255', 1.2); hitEnemy(nx, (6 + p.power) * P.dmg); spark(nx.x, nx.y, '220,200,255', 6, 160); }
+            }
+          }
         }
       }
+      if (camp.act === 4 && SEC2[P.id] && P.id !== 'c_dread' && p.sub !== 'L') { sec2T -= dt; if (sec2T <= 0) sec2T = fire2(); }
       if (freezeT > 0) freezeT -= dt;
       if (shieldT > 0) shieldT -= dt;
 
@@ -4837,7 +4890,7 @@ function makeShooter() {
       }
       pips(bx + 38, by + 19, 5, player.power, '#ff8a3d');
       dots(bx + 47, by + 41, 5, player.bombs, '#8f7bff');
-      label(weaponName(), bx + 38, by + 54, player.sub ? '#f6ecd9' : '#ffd3a8');
+      label(weaponName() + (camp.act === 4 && SEC2[P.id] && !player.sub ? ' + ' + SEC2[P.id] : ''), bx + 38, by + 54, player.sub ? '#f6ecd9' : '#ffd3a8');
       if (player.sub) {
         const colr = ITEM_STYLE[player.sub][0];
         ctx.fillStyle = 'rgba(255,255,255,0.15)'; rr(bx + 92, by + 56, 62, 8, 4); ctx.fill();
@@ -5220,6 +5273,9 @@ function drawPreview(canvas, plane) {
   ctx = saved;
 }
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
+// endless only: a second basic weapon that fits each plane
+const SEC2 = { swallow: '칼날 깃', hawk: '화염탄', ox: '돌진 산탄', owl: '달빛 초승달', c_twin: '해·달 궤도탄', c_beacon: '탐조 광선',
+  c_cloud: '우박', c_fortress: '방패 박격포', c_ace: '비행운 미사일', c_dread: '강화 번개' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
 function refitPlane(idx) {
@@ -5269,7 +5325,7 @@ function renderHangar() {
   } else {
     add('pi-name', `${c.title} ${c.name}`);
     add('pi-story desc', c.story);
-    add('pi-kit', `무기 ${c.weaponName} · 폭탄 ${c.bombName} · 필살기 ${c.ultName}`);
+    add('pi-kit', `무기 ${c.weaponName}${E && SEC2[c.id] ? ' + ' + SEC2[c.id] : ''} · 폭탄 ${c.bombName} · 필살기 ${c.ultName}`);
     if (E) { const b = Save.endlessBest(c.id, App.setup.diff); add('pi-rec', `무한 최고 ${fmt(b.all)} · 노컨티뉴 ${b.nc ? fmt(b.nc) : '없음'}`); }
     const stat = add('pstat', '');
     ['속도', '내구', '화력'].forEach((lab, k) => {
