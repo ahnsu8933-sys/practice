@@ -1440,14 +1440,30 @@ function drawFactory(e, col, blink, hurt) {
   ctx.beginPath(); ctx.ellipse(0, -10, 2.6, 7.5, 0, 0, TAU); ctx.fill();
   if (hurt > 0.5) arcs(0, 0, 150, 3, '255,150,90');
 }
+let shadeCv = null, inShade = false;
+function shadowGlow(e) { glowDot(e.x, e.y, (e.hw || e.r || 30) * 1.7, '150,80,255', 0.35 + 0.15 * Math.sin(time * 5)); }
+function drawShadowed(list) {
+  const main = ctx, cvs = main.canvas;
+  if (!(cvs && cvs.width > 0) || typeof main.getTransform !== 'function') { for (const e of list) drawEnemy(e); return; }
+  for (const e of list) shadowGlow(e);
+  if (!shadeCv) shadeCv = document.createElement('canvas');
+  if (shadeCv.width !== cvs.width || shadeCv.height !== cvs.height) { shadeCv.width = cvs.width; shadeCv.height = cvs.height; }
+  const o = shadeCv.getContext('2d'), t = main.getTransform();
+  o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, cvs.width, cvs.height);
+  o.setTransform(t);
+  ctx = o; inShade = true;
+  try { for (const e of list) drawEnemy(e); } finally { inShade = false; ctx = main; }
+  // one darkening pass over the whole layer, only where the bosses were drawn
+  o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-atop';
+  o.fillStyle = 'rgba(22,19,34,0.7)'; o.fillRect(0, 0, cvs.width, cvs.height);
+  o.globalCompositeOperation = 'source-over';
+  main.save(); main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(shadeCv, 0, 0); main.restore();
+}
 function drawEnemy(e) {
   ctx.save();
+  if (e.shadow && !inShade) shadowGlow(e);
   ctx.translate(e.x, e.y);
   if (e.rot) ctx.rotate(e.rot);
-  if (e.shadow) {
-    glowDot(0, 0, (e.hw || e.r || 30) * 1.7, '150,80,255', 0.35 + 0.15 * Math.sin(time * 5));
-    ctx.filter = 'grayscale(0.7) brightness(0.6) contrast(1.25)';
-  }
   const col = base => e.flash > 0 ? '#ffffff' : e.craft ? lightHex(base) : base;
   const blink = 0.6 + 0.4 * Math.sin(time * 8 + e.x);
   const hurt = e.maxHp ? 1 - e.hp / e.maxHp : 0;
@@ -5155,8 +5171,11 @@ function makeShooter() {
       drawSkyBack();
       const bossOn = bossParts().length > 0;
       if (bossOn) { ctx.fillStyle = 'rgba(30,0,20,0.22)'; ctx.fillRect(-20, -20, W + 40, H + 40); }
-      for (const e of enemies) if (e.type !== 'turret') drawEnemy(e);
-      for (const e of enemies) if (e.type === 'turret') drawEnemy(e);
+      const shade = [];
+      for (const e of enemies) if (e.type !== 'turret') { if (e.shadow) shade.push(e); else drawEnemy(e); }
+      for (const e of enemies) if (e.type === 'turret' && e.shadow) shade.push(e);
+      if (shade.length) drawShadowed(shade);
+      for (const e of enemies) if (e.type === 'turret' && !e.shadow) drawEnemy(e);
       if (hasRule('storm')) drawClouds();
       if (hasRule('night') && !finale) drawNight();
       for (const it of items) drawItem(it);
