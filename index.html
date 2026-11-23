@@ -1698,6 +1698,37 @@ function drawPlayerBullets(list) {
       ctx.restore();
       continue;
     }
+    if (b.style === 'hurricane') {
+      // drawn as a small storm seen from above: a shadow on the clouds below, a domed body lit from the upper left,
+      // spiral bands that thicken toward the core, and a dark eye with a bright eyewall
+      ctx.rotate(-b.ang);
+      const fade = Math.min(1, b.life * 2), R = 28;
+      ctx.fillStyle = `rgba(20,30,60,${0.28 * fade})`; ctx.beginPath(); ctx.ellipse(7, 11, R, R * 0.8, 0, 0, TAU); ctx.fill();
+      let g = ctx.createRadialGradient(-9, -10, 3, 0, 0, R);
+      g.addColorStop(0, `rgba(245,248,255,${0.75 * fade})`); g.addColorStop(0.55, `rgba(165,185,230,${0.55 * fade})`); g.addColorStop(1, 'rgba(90,110,170,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, TAU); ctx.fill();
+      ctx.save(); ctx.rotate(-time * 9 - b.seed); ctx.lineCap = 'round';
+      for (let arm = 0; arm < 3; arm++) {
+        ctx.rotate(TAU / 3);
+        let px = 5, py = 0;
+        for (let j = 1; j <= 12; j++) {
+          const t = j / 12, an = t * 2.6, r = 5 + t * 21, x = Math.cos(an) * r, y = Math.sin(an) * r;
+          // the side facing the light is brighter, the far side darker
+          const lit = 0.5 + 0.5 * Math.cos(Math.atan2(y, x) - time * 9 - b.seed + 2.4);
+          ctx.strokeStyle = `rgba(${Math.round(170 + 85 * lit)},${Math.round(185 + 70 * lit)},255,${(0.95 - t * 0.6) * fade})`;
+          ctx.lineWidth = 6.5 * (1 - t) + 1;
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke();
+          px = x; py = y;
+        }
+      }
+      ctx.restore();
+      ctx.fillStyle = `rgba(60,75,130,${0.25 * fade})`; ctx.beginPath(); ctx.arc(4, 5, R * 0.85, 0.2, Math.PI - 0.2); ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 5.5, 0, TAU); ctx.stroke();
+      ctx.fillStyle = `rgba(40,55,105,${0.9 * fade})`; ctx.beginPath(); ctx.arc(0.8, 0.8, 4, 0, TAU); ctx.fill();
+      ctx.fillStyle = `rgba(255,255,255,${0.5 * fade})`; ctx.beginPath(); ctx.ellipse(-12, -13, 6, 3, -0.7, 0, TAU); ctx.fill();
+      ctx.restore();
+      continue;
+    }
     if (b.style === 'torpedo') {
       ctx.fillStyle = 'rgba(180,220,255,0.35)'; for (let j = 0; j < 3; j++) { ctx.beginPath(); ctx.arc(Math.sin(time * 9 + j * 2) * 2, 15 + j * 6, 2.2 - j * 0.5, 0, TAU); ctx.fill(); }
       ctx.fillStyle = '#5b6578'; rr(-5, -12, 10, 24, 5); ctx.fill();
@@ -2656,8 +2687,8 @@ function makeShooter() {
     ox: { cd: 1.25, radius: 150, reach: 240, speed: 560, dmg: 7, torp: 1.4, torpDmg: 16, torpR: 72 },   // defensive: a close ring that wipes nearby bullets                       // 충격파: hits nearby enemies and wipes nearby bullets
     owl: { cd: 0.3, shot: 1.3 },                                // 달빛 위성: two moons orbit and shoot
     c_twin: { cd: 0.4, missile: 1.9 },                          // 해·달 유도탄: a homing missile from each fighter
-    c_beacon: { cd: 2.6, dur: 0.9, dps: 95 },                   // 회전 광선: a wide sweeping beam
-    c_cloud: { cd: 1.1, strike: 9 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
+    c_beacon: { cd: 2.0, dur: 0.9, dps: 95 },                   // 회전 광선: a wide sweeping beam
+    c_cloud: { cd: 1.1, strike: 9, vortex: 1.4, vdps: 20, vr: 30 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
     c_fortress: { cd: 0.5, beam: 3.4, guard: 20, rgb: '255,210,120' },  // 방패 위성: lasers, and the satellites block bullets
     c_ace: { cd: 0.45, zap: 4.6, chain: 2, rgb: '255,236,150' },  // 번개 위성: two satellites strike the nearest foes, and the bolt jumps on
   };
@@ -2759,6 +2790,20 @@ function makeShooter() {
     const p = player, k = 0.8 + 0.1 * p.power, d = P.dmg;
     // 해와 달, 올빼미 and 제비 carry the same shockwave as 황소, on the same timing
     if (P.id === 'c_twin' || P.id === 'owl' || P.id === 'swallow') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p); } }
+    if (P.id === 'c_cloud') {
+      secFx.vxT = (secFx.vxT === undefined ? 0.8 : secFx.vxT) - dt;
+      if (secFx.vxT <= 0) {
+        secFx.vxT = S2.c_cloud.vortex;
+        pb.push({ x: p.x, y: p.y - 30, vx: 0, vy: -120, ang: 0, h: -Math.PI / 2, dmg: 0, style: 'hurricane', torp: true, vortex: true, life: 6.5, dps: S2.c_cloud.vdps * k * d, seed: Math.random() * TAU });
+        tone(300, 0.25, 'sine', 0.02, 600);
+      }
+      // a hurricane grinds whatever it passes over and swallows enemy bullets
+      const R = S2.c_cloud.vr;
+      for (const b of pb) if (b.vortex) {
+        for (const e of enemies.slice()) if (!e.dead && Math.hypot(e.x - b.x, e.y - b.y) < R + (e.hw || e.r || 16) * 0.6) { hitEnemy(e, b.dps * dt); if (Math.random() < 0.15) spark(e.x, e.y, '200,215,255', 2, 120); }
+        for (const q of eb) if (!q.hit && Math.hypot(q.x - b.x, q.y - b.y) < R) { q.hit = true; spark(q.x, q.y, '200,215,255', 2, 80); }
+      }
+    }
     if (P.id === 'ox') {
       secFx.tpT = (secFx.tpT === undefined ? 0.6 : secFx.tpT) - dt;
       if (secFx.tpT <= 0) {
@@ -5506,7 +5551,7 @@ function drawPreview(canvas, plane) {
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
 const SEC2 = { swallow: '깃털 위성·충격파', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성·충격파', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
-  c_cloud: '낙뢰 구름', c_fortress: '방패 위성', c_ace: '번개 위성', c_dread: '연쇄 번개' };
+  c_cloud: '낙뢰 구름·허리케인', c_fortress: '방패 위성', c_ace: '번개 위성', c_dread: '연쇄 번개' };
 const SEC2ROLE = { swallow: '위성·방어', hawk: '위성·유도', ox: '방어·폭탄', owl: '지원·방어', c_twin: '유도·방어', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
