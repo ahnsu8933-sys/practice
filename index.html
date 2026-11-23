@@ -2453,7 +2453,8 @@ function makeShooter() {
     bossSpawned = true;
     bossItemT = 6; escortT = 1; heavyT = 6;
     const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null;
-    const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1);
+    const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1)
+      * (camp.act === 4 && !camp.attack ? 1.15 : 1);   // endless: second weapons hit harder, so bosses hold a little longer
     // endless: every third stage from 43, two bosses at once (the second one a shadow)
     if (camp.act === 4 && ei() >= 57 && (ei() - 41) % 3 === 2) {
       const a = COMBO.includes(bossKind) ? bossKind : COMBO[Math.floor(Math.random() * COMBO.length)];
@@ -2654,7 +2655,7 @@ function makeShooter() {
     hawk: { cd: 0.36, missile: 1.3, per: 2, rgb: '255,170,110' },       // 미사일 위성: two satellites launch homing missiles at different foes
     ox: { cd: 1.25, radius: 150, reach: 240, speed: 560, dmg: 7, torp: 1.4, torpDmg: 16, torpR: 72 },   // defensive: a close ring that wipes nearby bullets                       // 충격파: hits nearby enemies and wipes nearby bullets
     owl: { cd: 0.3, shot: 1.3 },                                // 달빛 위성: two moons orbit and shoot
-    c_twin: { cd: 0.4, missile: 1.9, shock: 2.0 },                          // 해·달 유도탄: a homing missile from each fighter
+    c_twin: { cd: 0.4, missile: 1.9 },                          // 해·달 유도탄: a homing missile from each fighter
     c_beacon: { cd: 2.6, dur: 0.9, dps: 95 },                   // 회전 광선: a wide sweeping beam
     c_cloud: { cd: 1.1, strike: 9 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
     c_fortress: { cd: 0.5, beam: 3.4, guard: 20, rgb: '255,210,120' },  // 방패 위성: lasers, and the satellites block bullets
@@ -2756,7 +2757,8 @@ function makeShooter() {
   // per-frame parts of the second weapons: owl moons, the beacon sweep, storm clouds
   function updateSec(dt) {
     const p = player, k = 0.8 + 0.1 * p.power, d = P.dmg;
-    if (P.id === 'c_twin') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.c_twin.shock; shockFrom(p); } }
+    // 해와 달 and 올빼미 carry the same shockwave as 황소, on the same timing
+    if (P.id === 'c_twin' || P.id === 'owl') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p); } }
     if (P.id === 'ox') {
       secFx.tpT = (secFx.tpT === undefined ? 0.6 : secFx.tpT) - dt;
       if (secFx.tpT <= 0) {
@@ -5099,7 +5101,10 @@ function makeShooter() {
       bigText(fmt(score), 20, 29);
       if (ext) label('스치기 ' + grazes + (camp.act === 4 ? ' · 점수 ×' + scoreMul().toFixed(1) + ' · 규칙 ' + (camp.rules || []).length + (lateK() ? ' · 압박 +' + Math.round(lateK() * 100) + '%' : '') : ''), 20, 55, '#c9ecff');
       const bx = 14, by = H - 106;
-      panel(bx - 4, by - 6, 170, 98);
+      // the panel widens when the weapon line (main + second) is long
+      const wLine = weaponName() + (camp.act === 4 && SEC2[P.id] ? ' + ' + SEC2[P.id] : '');
+      ctx.font = '11px "Gowun Dodum", sans-serif';
+      panel(bx - 4, by - 6, Math.max(170, ctx.measureText(wLine).width + 50), 98);
       label('기체', bx + 4, by, '#d8d2ea');
       label('화력', bx + 4, by + 18, '#d8d2ea');
       label('폭탄', bx + 4, by + 36, '#d8d2ea');
@@ -5114,7 +5119,7 @@ function makeShooter() {
       pips(bx + 38, by + 19, 5, player.power, '#ff8a3d');
       dots(bx + 47, by + 41, 5, player.bombs, '#8f7bff');
       const sec = camp.act === 4 && SEC2[P.id];
-      label(weaponName() + (sec ? ' + ' + SEC2[P.id] : ''), bx + 38, by + 54, player.sub ? '#f6ecd9' : '#ffd3a8');
+      label(wLine, bx + 38, by + 54, player.sub ? '#f6ecd9' : '#ffd3a8');
       if (player.sub) {
         const colr = ITEM_STYLE[player.sub][0];
         // with a second weapon the name is longer, so the item timer moves to a thin bar under it
@@ -5500,9 +5505,9 @@ function drawPreview(canvas, plane) {
 }
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
-const SEC2 = { swallow: '깃털 위성', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
+const SEC2 = { swallow: '깃털 위성', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성·충격파', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
   c_cloud: '낙뢰 구름', c_fortress: '방패 위성', c_ace: '번개 위성', c_dread: '연쇄 번개' };
-const SEC2ROLE = { swallow: '위성', hawk: '위성·유도', ox: '방어·폭탄', owl: '지원', c_twin: '유도·방어', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
+const SEC2ROLE = { swallow: '위성', hawk: '위성·유도', ox: '방어·폭탄', owl: '지원·방어', c_twin: '유도·방어', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
 function refitPlane(idx) {
