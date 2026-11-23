@@ -2644,11 +2644,11 @@ function makeShooter() {
     hawk: { cd: 0.9, talon: 3.6 },                              // 급강하 발톱: homing strikes on the toughest enemy
     ox: { cd: 2.2, radius: 150, reach: 240, speed: 560, dmg: 7 },   // defensive: a close ring that wipes nearby bullets                       // 충격파: hits nearby enemies and wipes nearby bullets
     owl: { cd: 0.3, shot: 1.3 },                                // 달빛 위성: two moons orbit and shoot
-    c_twin: { cd: 0.5, shard: 1.4 },                            // 일식 폭발탄: two orbs burst into rings at the sides
+    c_twin: { cd: 0.4, missile: 2.4 },                          // 해·달 유도탄: a homing missile from each fighter
     c_beacon: { cd: 2.6, dur: 0.9, dps: 95 },                   // 회전 광선: a wide sweeping beam
     c_cloud: { cd: 1.1, strike: 9 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
     c_fortress: { cd: 1.0, boom: 5.5, radius: 80, shard: 1.1 },  // 파편 박격포: explodes and throws shrapnel
-    c_ace: { cd: 0.8, mini: 1.4 },                              // 분열 미사일: splits into six homing missiles
+    c_ace: { cd: 0.8, mini: 1.25 },                             // 분열 미사일: splits into eight homing missiles
   };
   function shotDir(x, y, a, sp, dmg, style, extra) { return Object.assign({ x, y, vx: Math.sin(a) * sp, vy: -Math.cos(a) * sp, dmg, ang: a, style }, extra || {}); }
   function spawnSplit(b) {
@@ -2704,9 +2704,11 @@ function makeShooter() {
         shake = Math.max(shake, 0.2); boom(0.3, 0.12, 400);
         return T.cd;
       }
-      case 'c_twin':
-        for (const sd of [-1, 1]) pb.push(shotDir(p.x + sd * 30, p.y - 10, (() => { const tg = sideTarget(sd); return tg ? Math.max(-1.2, Math.min(1.2, aimTo(p.x + sd * 30, p.y - 10, tg))) : sd * 0.4; })(), 600, 1.2 * k * d, 'ally', { big: true, core: sd < 0 ? '#fff0b0' : '#d8f0ff', split: { t: 0.9, prox: 50, kind: 'ring', n: 10, sp: 520, dmg: T.shard * k * d, style: 'ally', core: sd < 0 ? '#fff0b0' : '#d8f0ff', life: 0.7, rgb: '90,255,180' } }));
+      case 'c_twin': {  // 해·달 유도탄: each fighter launches a homing missile at a different target
+        const L = visibleFoes().sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+        [-1, 1].forEach((sd, i) => pb.push({ x: p.x + sd * 22, y: p.y - 10, h: -Math.PI / 2 + sd * 0.7, vx: 0, vy: 0, ang: 0, dmg: T.missile * k * d, homing: true, life: 2, target: L.length ? L[(secFx.tw = ((secFx.tw || 0) + 1)) % L.length] : null }));
         return T.cd;
+      }
       case 'c_beacon':
         secFx.push({ kind: 'sweep', t: 0, dur: T.dur, dir: (secFx.sweepDir = -(secFx.sweepDir || 1)) });
         tone(900, 0.6, 'sine', 0.03, 1500);
@@ -2723,7 +2725,7 @@ function makeShooter() {
         tone(140, 0.12, 'square', 0.03, 70);
         return T.cd;
       case 'c_ace':
-        pb.push(shotDir(p.x, p.y - 20, 0, 700, 1.2 * k * d, 'lamp', { split: { t: 0.3, prox: 60, kind: 'missiles', n: 6, dmg: T.mini * k * d, rgb: '255,235,180' } }));
+        pb.push(shotDir(p.x, p.y - 20, 0, 700, 1.2 * k * d, 'lamp', { split: { t: 0.3, prox: 60, kind: 'missiles', n: 8, dmg: T.mini * k * d, rgb: '255,235,180' } }));
         return T.cd;
     }
     return 1;
@@ -5427,9 +5429,9 @@ function drawPreview(canvas, plane) {
 }
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
-const SEC2 = { swallow: '깃털 폭산탄', hawk: '급강하 발톱', ox: '충격파', owl: '달빛 위성', c_twin: '일식 폭발탄', c_beacon: '회전 광선',
+const SEC2 = { swallow: '깃털 폭산탄', hawk: '급강하 발톱', ox: '충격파', owl: '달빛 위성', c_twin: '해·달 유도탄', c_beacon: '회전 광선',
   c_cloud: '낙뢰 구름', c_fortress: '파편 박격포', c_ace: '분열 미사일', c_dread: '연쇄 번개' };
-const SEC2ROLE = { swallow: '광역', hawk: '집중', ox: '방어', owl: '지원', c_twin: '광역', c_beacon: '광역', c_cloud: '광역', c_fortress: '광역', c_ace: '광역', c_dread: '연쇄' };
+const SEC2ROLE = { swallow: '광역', hawk: '집중', ox: '방어', owl: '지원', c_twin: '유도', c_beacon: '광역', c_cloud: '광역', c_fortress: '광역', c_ace: '광역', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
 const ORIG_ULT = { swallow: '뇌전 그물', hawk: '편대 융단 폭격', ox: '강철 낙하', owl: '달의 눈' };
 function refitPlane(idx) {
