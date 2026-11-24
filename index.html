@@ -4777,10 +4777,10 @@ function makeShooter() {
     enemies = enemies.filter(e => !e.dead && !e.gone);
 
     ruleWind = 0;
-    if (hasRule('wind')) { const g = Math.sin(time * 0.4); ruleWind = Math.abs(g) < 0.3 ? 0 : Math.sign(g) * (Math.abs(g) - 0.3) / 0.7 * 90; if (!windNow) windNow = ruleWind; }
+    if (hasRule('wind')) { const g = Math.sin(time * 0.4); ruleWind = Math.abs(g) < 0.3 ? 0 : Math.sign(g) * (Math.abs(g) - 0.3) / 0.7 * 115; if (!windNow) windNow = ruleWind; }
     for (const b of eb) {
       if (freezeT > 0) continue;
-      if (ruleWind) { const add = ruleWind * 1.1 * dt; b.drift = b.drift || 0; if (Math.abs(b.drift + add) <= 110) { b.drift += add; b.vx += add; } }
+      if (ruleWind) { const add = ruleWind * 1.1 * dt; b.drift = b.drift || 0; if (Math.abs(b.drift + add) <= 140) { b.drift += add; b.vx += add; } }
       b.x += b.vx * dt; b.y += b.vy * dt;
       if (b.fuse !== undefined) {
         b.fuse -= dt;
@@ -5050,6 +5050,7 @@ function makeShooter() {
         anchor.x -= tx - clamp(tx, 22, W - 22);
         anchor.y -= ty - clamp(ty, 40, H - 34);
       }
+      if (ruleWind) { const wp = ruleWind * 0.18 * mdt; p.x += wp; if (drag && anchor) anchor.x += wp; }
       p.x = clamp(p.x, 22, W - 22);
       p.y = clamp(p.y, 40, H - 34);
       const targetTilt = clamp(dxMove / (P.speed * mdt || 1), -1, 1);
