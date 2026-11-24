@@ -2600,7 +2600,8 @@ function makeShooter() {
     } else if (bossKind === 'boss') {
       mk('boss', 920, { x: W / 2, y: -110, hw: 70, hh: 34, r: 48, beamT: 3, freeze: 0, score: 5000 });
     } else if (bossKind === 'factory') {
-      mk('factory', 1500, { x: W / 2, y: -120, hw: 172, hh: 56, r: 60, launchT: 1.5, launchFx: 0, beamT: 4, fireT: 2, fire2: 2.5, score: 20000 });
+      mk('factory', 2400, {   // final boss: was 1500
+        x: W / 2, y: -120, hw: 172, hh: 56, r: 60, launchT: 1.5, launchFx: 0, beamT: 4, fireT: 2, fire2: 2.5, score: 20000 });
     } else if (bossKind === 'ace') {
       mk('ace', 780, { x: W / 2, y: -60, r: 24, mode: 'roam', pickT: 0, tx: W / 2, ty: 150, burst: 0, burstT: 0, dashT: 4, face: Math.PI / 2, score: 5500 });
     } else {
@@ -5118,11 +5119,12 @@ function makeShooter() {
           // escort squad: a few scouts fly in beside the boss (fewer for the carrier, which launches its own)
           escortT -= dt;
           if (escortT <= 0) {
-            const nest = b.type === 'nest' || b.type === 'factory';
+            const fin = b.type === 'factory';   // the final boss brings a larger escort
+            const nest = b.type === 'nest' || fin;
             const E4 = camp.act === 4;
-            escortT = (nest ? 5 : 3.5) - Math.min(1, 0.1 * grow()) + (E4 ? 1.5 : 0);
-            if (enemies.filter(e => e.escort && !e.dead).length < (E4 ? 7 : 11) && !(E4 && onScreen() >= crowdCap())) {
-              const n = E4 ? 4 : nest ? 4 : grow() >= 4 ? 6 : 5, side = Math.random() < 0.5 ? -1 : 1;
+            escortT = (fin ? 4 : nest ? 5 : 3.5) - Math.min(1, 0.1 * grow()) + (E4 ? 1.5 : 0);
+            if (enemies.filter(e => e.escort && !e.dead).length < (E4 ? 7 : fin ? 14 : 11) && !(E4 && onScreen() >= crowdCap())) {
+              const n = E4 ? 4 : fin ? 6 : nest ? 4 : grow() >= 4 ? 6 : 5, side = Math.random() < 0.5 ? -1 : 1;
               const x0 = clamp(b.x + side * rand(110, 170), 60, W - 60), freq = rand(1.8, 2.8);
               for (let i = 0; i < n; i++) addEnemy('scout', { x: x0, y: -30 - i * 40, x0, amp: rand(20, 45), freq, vy: 135 + 4 * grow(), phase: i * 0.5, escort: true });
             }
