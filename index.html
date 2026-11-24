@@ -375,6 +375,51 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 #menuScr .keys { grid-template-columns: repeat(4, auto); gap: 4px 12px; }
 .menu-inner { display: flex; flex-direction: column; align-items: center; gap: inherit; width: 100%; transform-origin: 50% 0; }
 .menu-inner > * { flex-shrink: 0; }
+/* title screen entrance: clouds part, two jets streak past, the title slams in, the mode cards fly in.
+   Full on the first visit, quick when coming back from a run; a tap skips it. */
+#menuScr { --k: 1; }
+#menuScr.quick { --k: 0.35; }
+#menuScr > .menu-inner { margin-top: auto; margin-bottom: auto; }
+.m-curtain, .m-jet { position: absolute; pointer-events: none; z-index: 3; }
+.m-curtain { inset: 0; display: none; }
+.m-curtain i { position: absolute; top: 0; bottom: 0; width: 52%; background: radial-gradient(60% 40% at 80% 50%, rgba(120,110,170,0.9), transparent 70%), linear-gradient(180deg, #2a2850, #141a33); }
+.m-curtain i:first-child { left: 0; }
+.m-curtain i:last-child { right: 0; transform: scaleX(-1); }
+.m-jet { display: none; left: -60%; top: 26%; width: 55%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255,240,220,0.95)); transform: rotate(-10deg); box-shadow: 0 0 10px rgba(255,220,170,0.8); }
+.m-jet2 { top: 31%; height: 1.5px; opacity: 0.7; }
+.m-title { position: relative; }
+.m-l1, .m-l2 { display: inline-block; }
+.m-title::after { content: ''; position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid rgba(255,220,170,0.9); opacity: 0; pointer-events: none; }
+.card { position: relative; overflow: hidden; }
+.card::after { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; background: linear-gradient(100deg, transparent, rgba(255,240,215,0.22), transparent); pointer-events: none; }
+.card[aria-pressed="true"]::after { animation: mShine 4.2s 1.5s ease-in-out infinite; }
+#menuScr.intro:not(.quick) .m-curtain { display: block; }
+#menuScr.intro:not(.quick) .m-curtain i:first-child { animation: mOpenL 0.9s 0.15s cubic-bezier(.6,0,.3,1) both; }
+#menuScr.intro:not(.quick) .m-curtain i:last-child { animation: mOpenR 0.9s 0.15s cubic-bezier(.6,0,.3,1) both; }
+#menuScr.intro:not(.quick) .m-jet { display: block; animation: mJet 0.7s 0.75s ease-in both; }
+#menuScr.intro:not(.quick) .m-jet2 { animation-delay: 0.88s; }
+#menuScr.intro .eyebrow { animation: mType 0.6s calc(var(--k) * 0.55s) ease-out backwards; }
+#menuScr.intro .m-l1 { animation: mSlam 0.5s calc(var(--k) * 0.85s) cubic-bezier(.2,1.5,.4,1) backwards; }
+#menuScr.intro .m-l2 { animation: mSlam 0.5s calc(var(--k) * 1.05s) cubic-bezier(.2,1.5,.4,1) backwards; }
+#menuScr.intro .m-title::after { animation: mRing 0.7s calc(var(--k) * 1.2s) ease-out both; }
+#menuScr.intro .m-title { animation: mJolt 0.4s calc(var(--k) * 1.12s) linear; }
+#menuScr.intro .lead, #menuScr.intro .keys { animation: mFade 0.5s calc(var(--k) * 1.35s) ease-out backwards; }
+#menuScr.intro #modeList > * { animation: mFly 0.5s calc(var(--k) * (1.45s + var(--i, 0) * 0.11s)) cubic-bezier(.2,1.2,.4,1) backwards; }
+#menuScr.intro #modeList > .card::after { animation: mShine 0.8s calc(var(--k) * (1.85s + var(--i, 0) * 0.11s)) ease-out; }
+#menuScr.intro .menu-inner > p.small { animation: mFade 0.5s calc(var(--k) * 2.1s) ease-out backwards; }
+#menuScr.skip *, #menuScr.skip *::after { animation: none !important; }
+#menuScr.skip .m-curtain, #menuScr.skip .m-jet { display: none !important; }
+@keyframes mOpenL { from { transform: translateX(0); } to { transform: translateX(-105%); } }
+@keyframes mOpenR { from { transform: scaleX(-1) translateX(0); } to { transform: scaleX(-1) translateX(-105%); } }
+@keyframes mJet { from { left: -60%; } to { left: 120%; } }
+@keyframes mType { from { letter-spacing: 0.9em; opacity: 0; filter: blur(3px); } to { opacity: 1; } }
+@keyframes mSlam { 0% { transform: scale(2.4); opacity: 0; filter: blur(6px); } 60% { transform: scale(0.94); opacity: 1; filter: none; } 100% { transform: scale(1); } }
+@keyframes mRing { 0% { transform: scale(0.3); opacity: 0.9; } 100% { transform: scale(3.2); opacity: 0; } }
+@keyframes mJolt { 0%, 100% { transform: none; } 20% { transform: translate(-3px, 2px); } 45% { transform: translate(3px, -2px); } 70% { transform: translate(-1px, 1px); } }
+@keyframes mFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes mFly { from { opacity: 0; transform: translateX(70px) skewX(-8deg); } to { opacity: 1; transform: none; } }
+@keyframes mShine { 0% { left: -60%; } 30%, 100% { left: 130%; } }
+@media (prefers-reduced-motion: reduce) { #menuScr *, #menuScr *::after { animation: none !important; } .m-curtain, .m-jet { display: none !important; } }
 .card-sub {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   width: 100%; margin-top: -4px; padding: 7px 14px;
@@ -423,9 +468,11 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
     <button class="chip" id="skipBtn" type="button" hidden>대사 건너뛰기 ≫</button>
 
     <div class="overlay" id="menuScr">
+     <div class="m-curtain" aria-hidden="true"><i></i><i></i></div>
+     <i class="m-jet" aria-hidden="true"></i><i class="m-jet m-jet2" aria-hidden="true"></i>
      <div class="menu-inner" id="menuInner">
       <p class="eyebrow">고도 3,200m · 구름바다 상공</p>
-      <h1>구름바다<br>요격전</h1>
+      <h1 class="m-title"><span class="m-l1">구름바다</span><br><span class="m-l2">요격전</span></h1>
       <p class="lead">새벽 편대가 사라진 지 3년. 오늘은 얼마나 날아 볼까요?</p>
       <ul class="keys">
         <li><b>이동</b></li><li>방향키 · WASD · 화면 드래그</li>
@@ -5559,6 +5606,24 @@ function drawFoePreview(canvas, type) {
   ctx.translate(40, 40); ctx.scale(1.4, 1.4);
   try { drawEnemy({ type, x: 0, y: 0, t: 1, mt: 1, flash: 0, hp: 9, maxHp: 9, r: 16, ang: Math.PI / 2, phase: 1, shield: 14, maxShield: 14, sflash: 0, mode: 'aim', aimA: Math.PI / 2, mt2: 1, vx: 0, vy: 0 }); } finally { ctx = saved; }
 }
+// title screen entrance (see the #menuScr.intro styles); full = first visit of this session
+let menuIntroT = null;
+function playMenuIntro(full) {
+  const m = $('menuScr');
+  if (!m || !m.classList) return;
+  clearTimeout(menuIntroT);
+  const list = $('modeList');
+  if (list && list.children) [...list.children].forEach((el, i) => { if (el.style && el.style.setProperty) el.style.setProperty('--i', i); });
+  m.classList.remove('intro', 'quick', 'skip');
+  if (m.offsetWidth !== undefined) void m.offsetWidth;
+  m.classList.add('intro'); if (!full) m.classList.add('quick');
+  if (actx && !muted) {
+    const k = full ? 1 : 0.35;
+    if (full) setTimeout(() => tone(180, 0.7, 'sawtooth', 0.02, 900), 750);
+    setTimeout(() => { boom(0.3, 0.14, 600); tone(110, 0.25, 'square', 0.03, 55); }, 1000 * k * 1.12);
+  }
+  menuIntroT = setTimeout(() => m.classList.remove('intro', 'quick'), (full ? 2800 : 1200));
+}
 const briefTimers = [];
 function stopBrief() { while (briefTimers.length) clearTimeout(briefTimers.pop()); }
 function renderDaily() {
@@ -5781,7 +5846,9 @@ const App = {
   },
   menu() {
     stopBrief();
+    const from = App.mode;
     App.mode = 'menu'; App.game = null;
+    if (from !== 'menu') playMenuIntro(false);
     lockH = false; fit(); measureHud();
     flow = { x: 0, y: 1 }; streakAlpha = 0.12; setSky(0);
     parts = []; banner.t = 0;
@@ -6223,6 +6290,8 @@ $('overMenuBtn').addEventListener('click', () => App.menu());
 $('pauseMenuBtn').addEventListener('click', () => App.menu());
 [0, 1].forEach(i => $('pick' + i).addEventListener('click', () => App.choosePick(i)));
 $('pickBackBtn').addEventListener('click', () => App.menu());
+$('menuScr').addEventListener('pointerdown', () => { const m = $('menuScr'); if (m.classList.contains('intro')) m.classList.add('skip'); });
+playMenuIntro(true);
 $('dailyGoBtn').addEventListener('click', () => App.launchDaily());
 $('dailyBackBtn').addEventListener('click', () => App.openAttackPick());
 // a tap on the briefing (outside its buttons) shows everything at once
