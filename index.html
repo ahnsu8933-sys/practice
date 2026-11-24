@@ -375,43 +375,28 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 #menuScr .keys { grid-template-columns: repeat(4, auto); gap: 4px 12px; }
 .menu-inner { display: flex; flex-direction: column; align-items: center; gap: inherit; width: 100%; transform-origin: 50% 0; }
 .menu-inner > * { flex-shrink: 0; }
-/* title screen entrance: clouds part, two jets streak past, the title slams in, the mode cards fly in.
-   Full on the first visit, quick when coming back from a run; a tap skips it. */
-#menuScr { --k: 1; }
+/* title screen entrance. First visit: a take-off from the runway is drawn on the canvas, then the title slams in
+   and the mode cards fly in (--o holds the menu back until the plane is gone). Back from a run: a quick version. A tap skips it. */
+#menuScr { --k: 1; --o: 0s; }
+#menuScr.full { --o: 2.15s; }
 #menuScr.quick { --k: 0.35; }
 #menuScr > .menu-inner { margin-top: auto; margin-bottom: auto; }
-.m-curtain, .m-jet { position: absolute; pointer-events: none; z-index: 3; }
-.m-curtain { inset: 0; display: none; }
-.m-curtain i { position: absolute; top: 0; bottom: 0; width: 52%; background: radial-gradient(60% 40% at 80% 50%, rgba(120,110,170,0.9), transparent 70%), linear-gradient(180deg, #2a2850, #141a33); }
-.m-curtain i:first-child { left: 0; }
-.m-curtain i:last-child { right: 0; transform: scaleX(-1); }
-.m-jet { display: none; left: -60%; top: 26%; width: 55%; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, rgba(255,240,220,0.95)); transform: rotate(-10deg); box-shadow: 0 0 10px rgba(255,220,170,0.8); }
-.m-jet2 { top: 31%; height: 1.5px; opacity: 0.7; }
 .m-title { position: relative; }
 .m-l1, .m-l2 { display: inline-block; }
 .m-title::after { content: ''; position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid rgba(255,220,170,0.9); opacity: 0; pointer-events: none; }
 .card { position: relative; overflow: hidden; }
 .card::after { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; background: linear-gradient(100deg, transparent, rgba(255,240,215,0.22), transparent); pointer-events: none; }
 .card[aria-pressed="true"]::after { animation: mShine 4.2s 1.5s ease-in-out infinite; }
-#menuScr.intro:not(.quick) .m-curtain { display: block; }
-#menuScr.intro:not(.quick) .m-curtain i:first-child { animation: mOpenL 0.9s 0.15s cubic-bezier(.6,0,.3,1) both; }
-#menuScr.intro:not(.quick) .m-curtain i:last-child { animation: mOpenR 0.9s 0.15s cubic-bezier(.6,0,.3,1) both; }
-#menuScr.intro:not(.quick) .m-jet { display: block; animation: mJet 0.7s 0.75s ease-in both; }
-#menuScr.intro:not(.quick) .m-jet2 { animation-delay: 0.88s; }
-#menuScr.intro .eyebrow { animation: mType 0.6s calc(var(--k) * 0.55s) ease-out backwards; }
-#menuScr.intro .m-l1 { animation: mSlam 0.5s calc(var(--k) * 0.85s) cubic-bezier(.2,1.5,.4,1) backwards; }
-#menuScr.intro .m-l2 { animation: mSlam 0.5s calc(var(--k) * 1.05s) cubic-bezier(.2,1.5,.4,1) backwards; }
-#menuScr.intro .m-title::after { animation: mRing 0.7s calc(var(--k) * 1.2s) ease-out both; }
-#menuScr.intro .m-title { animation: mJolt 0.4s calc(var(--k) * 1.12s) linear; }
-#menuScr.intro .lead, #menuScr.intro .keys { animation: mFade 0.5s calc(var(--k) * 1.35s) ease-out backwards; }
-#menuScr.intro #modeList > * { animation: mFly 0.5s calc(var(--k) * (1.45s + var(--i, 0) * 0.11s)) cubic-bezier(.2,1.2,.4,1) backwards; }
-#menuScr.intro #modeList > .card::after { animation: mShine 0.8s calc(var(--k) * (1.85s + var(--i, 0) * 0.11s)) ease-out; }
-#menuScr.intro .menu-inner > p.small { animation: mFade 0.5s calc(var(--k) * 2.1s) ease-out backwards; }
+#menuScr.intro .eyebrow { animation: mType 0.6s calc(var(--o) + var(--k) * 0.15s) ease-out backwards; }
+#menuScr.intro .m-l1 { animation: mSlam 0.5s calc(var(--o) + var(--k) * 0.35s) cubic-bezier(.2,1.5,.4,1) backwards; }
+#menuScr.intro .m-l2 { animation: mSlam 0.5s calc(var(--o) + var(--k) * 0.55s) cubic-bezier(.2,1.5,.4,1) backwards; }
+#menuScr.intro .m-title::after { animation: mRing 0.7s calc(var(--o) + var(--k) * 0.7s) ease-out both; }
+#menuScr.intro .m-title { animation: mJolt 0.4s calc(var(--o) + var(--k) * 0.62s) linear; }
+#menuScr.intro .lead, #menuScr.intro .keys { animation: mFade 0.5s calc(var(--o) + var(--k) * 0.85s) ease-out backwards; }
+#menuScr.intro #modeList > * { animation: mFly 0.5s calc(var(--o) + var(--k) * (0.95s + var(--i, 0) * 0.11s)) cubic-bezier(.2,1.2,.4,1) backwards; }
+#menuScr.intro #modeList > .card::after { animation: mShine 0.8s calc(var(--o) + var(--k) * (1.35s + var(--i, 0) * 0.11s)) ease-out; }
+#menuScr.intro .menu-inner > p.small { animation: mFade 0.5s calc(var(--o) + var(--k) * 1.6s) ease-out backwards; }
 #menuScr.skip *, #menuScr.skip *::after { animation: none !important; }
-#menuScr.skip .m-curtain, #menuScr.skip .m-jet { display: none !important; }
-@keyframes mOpenL { from { transform: translateX(0); } to { transform: translateX(-105%); } }
-@keyframes mOpenR { from { transform: scaleX(-1) translateX(0); } to { transform: scaleX(-1) translateX(-105%); } }
-@keyframes mJet { from { left: -60%; } to { left: 120%; } }
 @keyframes mType { from { letter-spacing: 0.9em; opacity: 0; filter: blur(3px); } to { opacity: 1; } }
 @keyframes mSlam { 0% { transform: scale(2.4); opacity: 0; filter: blur(6px); } 60% { transform: scale(0.94); opacity: 1; filter: none; } 100% { transform: scale(1); } }
 @keyframes mRing { 0% { transform: scale(0.3); opacity: 0.9; } 100% { transform: scale(3.2); opacity: 0; } }
@@ -419,7 +404,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 @keyframes mFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes mFly { from { opacity: 0; transform: translateX(70px) skewX(-8deg); } to { opacity: 1; transform: none; } }
 @keyframes mShine { 0% { left: -60%; } 30%, 100% { left: 130%; } }
-@media (prefers-reduced-motion: reduce) { #menuScr *, #menuScr *::after { animation: none !important; } .m-curtain, .m-jet { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { #menuScr *, #menuScr *::after { animation: none !important; } }
 .card-sub {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   width: 100%; margin-top: -4px; padding: 7px 14px;
@@ -468,8 +453,6 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
     <button class="chip" id="skipBtn" type="button" hidden>대사 건너뛰기 ≫</button>
 
     <div class="overlay" id="menuScr">
-     <div class="m-curtain" aria-hidden="true"><i></i><i></i></div>
-     <i class="m-jet" aria-hidden="true"></i><i class="m-jet m-jet2" aria-hidden="true"></i>
      <div class="menu-inner" id="menuInner">
       <p class="eyebrow">고도 3,200m · 구름바다 상공</p>
       <h1 class="m-title"><span class="m-l1">구름바다</span><br><span class="m-l2">요격전</span></h1>
@@ -5607,22 +5590,78 @@ function drawFoePreview(canvas, type) {
   try { drawEnemy({ type, x: 0, y: 0, t: 1, mt: 1, flash: 0, hp: 9, maxHp: 9, r: 16, ang: Math.PI / 2, phase: 1, shield: 14, maxShield: 14, sflash: 0, mode: 'aim', aimA: Math.PI / 2, mt2: 1, vx: 0, vy: 0 }); } finally { ctx = saved; }
 }
 // title screen entrance (see the #menuScr.intro styles); full = first visit of this session
-let menuIntroT = null;
+let menuIntroT = null, introRun = null;
+const TAKEOFF = 2.3;
+// runway in perspective; the plane rolls up it, lifts off (its shadow stays behind), climbs and vanishes with a glint
+function drawTakeoff(t) {
+  const hy = H * 0.44, cx = W / 2;
+  const fade = 1 - clamp((t - 1.45) / 0.6, 0, 1);
+  const ease = x => x * x;
+  if (fade > 0) {
+    ctx.save(); ctx.globalAlpha = fade;
+    const g = ctx.createLinearGradient(0, hy, 0, H);
+    g.addColorStop(0, '#3a3456'); g.addColorStop(1, '#14152a');
+    ctx.fillStyle = g; ctx.fillRect(0, hy, W, H - hy);
+    ctx.fillStyle = 'rgba(255,200,150,0.25)'; ctx.fillRect(0, hy - 1, W, 2);   // horizon glow
+    const wTop = 26, wBot = W * 0.95, X = (u, side) => cx + side * (wTop + (wBot - wTop) * u) / 2, Y = u => hy + (H - hy) * u;
+    ctx.fillStyle = '#2a2a3c';
+    ctx.beginPath(); ctx.moveTo(X(0, -1), Y(0)); ctx.lineTo(X(0, 1), Y(0)); ctx.lineTo(X(1, 1), Y(1)); ctx.lineTo(X(1, -1), Y(1)); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,240,220,0.7)'; ctx.lineWidth = 2;
+    for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(X(0.02, sd * 0.92), Y(0.02)); ctx.lineTo(X(1, sd * 0.92), Y(1)); ctx.stroke(); }
+    // centre dashes stay put; the edge lights flash in sequence toward the horizon, leading the plane away
+    const chase = (t * 2.4) % 1;
+    for (let i = 0; i < 10; i++) {
+      const u0 = (i + 0.3) / 10, u1 = u0 + 0.04, a0 = u0 * u0, a1 = u1 * u1;
+      ctx.fillStyle = 'rgba(255,240,215,0.85)';
+      ctx.beginPath(); ctx.moveTo(cx - 1 - 3 * a0, Y(a0)); ctx.lineTo(cx + 1 + 3 * a0, Y(a0)); ctx.lineTo(cx + 1 + 3 * a1, Y(a1)); ctx.lineTo(cx - 1 - 3 * a1, Y(a1)); ctx.fill();
+      const lit = Math.abs((1 - u0) - chase) < 0.08 ? 1 : 0;
+      for (const sd of [-1, 1]) glowDot(X(a0, sd * 1.06), Y(a0), (3 + 9 * a0) * (1 + lit * 0.9), lit ? '255,250,230' : '255,190,110', 0.55 + 0.45 * lit);
+    }
+    ctx.restore();
+  }
+  // the plane: rolls (0.3-1.25 s), lifts off and climbs (to ~1.95 s), shrinking toward the horizon
+  const p = ease(clamp((t - 0.3) / 1.65, 0, 1));
+  const py = (H - 150) + ((hy - 150) - (H - 150)) * p, sc = 1.35 + (0.06 - 1.35) * p;
+  const lift = clamp((p - 0.3) / 0.4, 0, 1);
+  if (fade > 0 && p < 0.95) {   // the shadow stays on the runway and falls behind once airborne
+    const sy = (H - 120) + ((hy + 8) - (H - 120)) * Math.min(1, p * 1.1);
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.35 * (1 - lift) * fade) + ')';
+    ctx.beginPath(); ctx.ellipse(cx, sy + lift * 30 * sc, 46 * sc, 14 * sc, 0, 0, TAU); ctx.fill();
+  }
+  if (p < 1 && t < 2.05) {
+    const al = 1 - clamp((t - 1.85) / 0.2, 0, 1);
+    glowDot(cx, py + 46 * sc, (26 + 30 * Math.min(1, t)) * sc, '255,150,70', 0.85 * al);   // afterburner
+    ctx.save(); ctx.translate(cx, py - lift * 10 * sc); ctx.scale(sc, sc);
+    drawPlane(0, 0, 0, Math.sin(t * 7) * 0.05 * lift, al, menuProp, Object.assign({}, (PLANES[App.setup.plane] || PLANES[1]).look, { noShadow: true }));
+    ctx.restore();
+  }
+  // glint where it vanishes
+  const gl = clamp(1 - Math.abs(t - 2.02) / 0.22, 0, 1);
+  if (gl > 0) {
+    const gx = cx, gy = hy - 150, r = 34 * gl;
+    glowDot(gx, gy, r * 1.6, '255,230,180', gl);
+    ctx.strokeStyle = 'rgba(255,250,235,' + gl + ')'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(gx - r * 1.8, gy); ctx.lineTo(gx + r * 1.8, gy); ctx.moveTo(gx, gy - r); ctx.lineTo(gx, gy + r); ctx.stroke();
+  }
+}
 function playMenuIntro(full) {
   const m = $('menuScr');
   if (!m || !m.classList) return;
   clearTimeout(menuIntroT);
   const list = $('modeList');
   if (list && list.children) [...list.children].forEach((el, i) => { if (el.style && el.style.setProperty) el.style.setProperty('--i', i); });
-  m.classList.remove('intro', 'quick', 'skip');
+  m.classList.remove('intro', 'quick', 'full', 'skip');
+  const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (calm) { introRun = null; return; }
   if (m.offsetWidth !== undefined) void m.offsetWidth;
-  m.classList.add('intro'); if (!full) m.classList.add('quick');
+  m.classList.add('intro', full ? 'full' : 'quick');
+  introRun = full ? { t: 0 } : null;
+  const o = full ? 2.15 : 0, k = full ? 1 : 0.35;
   if (actx && !muted) {
-    const k = full ? 1 : 0.35;
-    if (full) setTimeout(() => tone(180, 0.7, 'sawtooth', 0.02, 900), 750);
-    setTimeout(() => { boom(0.3, 0.14, 600); tone(110, 0.25, 'square', 0.03, 55); }, 1000 * k * 1.12);
+    if (full) { tone(90, 1.8, 'sawtooth', 0.02, 420); setTimeout(() => boom(0.5, 0.1, 1800), 1100); }
+    setTimeout(() => { boom(0.3, 0.14, 600); tone(110, 0.25, 'square', 0.03, 55); }, 1000 * (o + k * 0.62));
   }
-  menuIntroT = setTimeout(() => m.classList.remove('intro', 'quick'), (full ? 2800 : 1200));
+  menuIntroT = setTimeout(() => m.classList.remove('intro', 'quick', 'full'), 1000 * (o + k * 2.4));
 }
 const briefTimers = [];
 function stopBrief() { while (briefTimers.length) clearTimeout(briefTimers.pop()); }
@@ -6290,7 +6329,7 @@ $('overMenuBtn').addEventListener('click', () => App.menu());
 $('pauseMenuBtn').addEventListener('click', () => App.menu());
 [0, 1].forEach(i => $('pick' + i).addEventListener('click', () => App.choosePick(i)));
 $('pickBackBtn').addEventListener('click', () => App.menu());
-$('menuScr').addEventListener('pointerdown', () => { const m = $('menuScr'); if (m.classList.contains('intro')) m.classList.add('skip'); });
+$('menuScr').addEventListener('pointerdown', () => { const m = $('menuScr'); if (m.classList.contains('intro')) m.classList.add('skip'); introRun = null; });
 playMenuIntro(true);
 $('dailyGoBtn').addEventListener('click', () => App.launchDaily());
 $('dailyBackBtn').addEventListener('click', () => App.openAttackPick());
@@ -6348,6 +6387,7 @@ function update(dt) {
   shake = Math.max(0, shake - dt);
   flashT = Math.max(0, flashT - dt);
   if (App.mode === 'menu' || App.mode === 'setup' || App.mode === 'daily' || App.mode === 'pick') { updateSky(dt); updateParts(dt); menuProp += dt * 40; }
+  if (introRun) { introRun.t += dt; if (introRun.t > TAKEOFF || App.mode !== 'menu') introRun = null; }
   hurtFx = Math.max(0, hurtFx - dt);
   if (App.mode === 'play' && !tipOn) { if (hitStop > 0) hitStop -= dt; else { App.game.update(dt); updateParts(dt); } }
   else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar' || App.mode === 'rule' || App.mode === 'gallery') { updateSky(dt, 0.4); updateParts(dt); }
@@ -6357,8 +6397,9 @@ function draw() {
   if (shake > 0 && !reduceMotion) ctx.translate(rand(-1, 1) * shake * 14, rand(-1, 1) * shake * 14);
   if (App.mode === 'menu' || !App.game) {
     drawSkyBack();
-    drawPlane(W / 2 + Math.sin(time * 0.8) * 70, H - 120 + Math.sin(time * 1.3) * 12, 0, Math.cos(time * 0.8) * 0.6, 1, menuProp);
-    drawSkyFront();
+    if (introRun && App.mode === 'menu') drawTakeoff(introRun.t);
+    else drawPlane(W / 2 + Math.sin(time * 0.8) * 70, H - 120 + Math.sin(time * 1.3) * 12, 0, Math.cos(time * 0.8) * 0.6, 1, menuProp);
+    if (!introRun || introRun.t > 1.6) drawSkyFront();
   } else {
     App.game.draw();
   }
