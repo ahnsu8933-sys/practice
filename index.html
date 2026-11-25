@@ -3756,9 +3756,9 @@ function makeShooter() {
       const n = [1, 1, 2, 2, 3][lv - 1];
       for (let i = 0; i < n; i++) { const a = (i - (n - 1) / 2) * 0.16; pb.push({ x: p.x, y: p.y - 20, vx: Math.sin(a) * 520, vy: -Math.cos(a) * 520, dmg: 0, ang: a, style: 'net', net: true, life: 0.95, age: 0, R: 22 + lv * 2, rad: 8, dps: 7 * P.dmg }); }
       p.cd = [0.2, 0.15, 0.2, 0.16, 0.18][lv - 1];
-      if (p.shot % 2 === 0) for (let i = 0; i < 2; i++) {   // the two baby spiders throw smaller nets
+      for (let i = 0; i < 2; i++) {   // the two baby spiders throw smaller nets with every shot
         const [bx, by] = babyPos(i);
-        pb.push({ x: bx, y: by - 8, vx: 0, vy: -520, dmg: 0, ang: 0, style: 'net', net: true, life: 0.8, age: 0, R: 9 + lv, rad: 5, dps: 3.5 * P.dmg });
+        pb.push({ x: bx, y: by - 8, vx: 0, vy: -520, dmg: 0, ang: 0, style: 'net', net: true, life: 0.85, age: 0, R: 12 + lv, rad: 6, dps: 6 * P.dmg });
       }
     } else if (P.weapon === 'needle') {
       const N = (dx, ang) => pb.push({ x: p.x + dx, y: p.y - 26, vx: Math.sin(ang) * 980, vy: -Math.cos(ang) * 980, dmg: 1.25 * P.dmg, ang, style: 'needle' });
@@ -3849,7 +3849,7 @@ function makeShooter() {
     c_fortress: { cd: 0.5, beam: 3.4, guard: 20, rgb: '255,210,120' },  // 방패 위성: lasers, and the satellites block bullets
     c_ace: { cd: 0.45, zap: 4.6, chain: 2, rgb: '255,236,150' },  // 번개 위성: two satellites strike the nearest foes, and the bolt jumps on
     e_truman: { cd: 0.7, missile: 1.6 },                           // 잔상 유도탄: three homing shots from afterimages
-    e_seed: { cd: 0.55, missile: 1.5 },                             // 민들레 위성: three dandelion satellites circle the craft and fire homing missiles
+    e_seed: { cd: 0.45, missile: 2.4 },                             // 민들레 위성: three dandelion satellites circle the craft and fire homing missiles
     e_halo: { cd: 0.55, beam: 3.2, rgb: '205,228,255' },          // 달빛 레이저: two moons fire piercing lasers
     e_octo: { cd: 1.0, dmg: 9, r: 72 },                           // 먹물탄: an ink ball lobbed at the thickest crowd; the splash hits and swallows bullets
     e_spider: { cd: 0.9, dps: 26, zap: 42, dur: 1.6 },            // 전기 실 화살: a charged thread latches onto the toughest foe; anything that crosses the thread is shocked too
