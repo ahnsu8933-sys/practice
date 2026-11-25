@@ -3913,7 +3913,7 @@ function makeShooter() {
       }
       case 'e_octo': {
         const tg = densest() || toughest();
-        secFx.push({ kind: 'inkball', x0: p.x, y0: p.y - 20, tx: tg ? tg.x : p.x, ty: tg ? tg.y : p.y - 260, t: 0, dur: 0.45, burst: false });
+        secFx.push({ kind: 'inkball', x: p.x, y: p.y - 20, tg, tx: tg ? tg.x : p.x, ty: tg ? tg.y : p.y - 260, t: 0, dur: 99, burst: false, trail: [], tc: 0 });
         tone(260, 0.1, 'sine', 0.02, 140);
         return T.cd;
       }
@@ -4039,6 +4039,14 @@ function makeShooter() {
         }
         if (f.r < S2.ox.radius) for (const b of eb) if (!b.hit && Math.hypot(b.x - f.x, b.y - f.y) < f.r) { b.hit = true; spark(b.x, b.y, '255,220,150', 2, 80); }
       } else if (f.kind === 'inkball') {
+        if (!f.burst) {
+          if (f.tg && !f.tg.dead) { f.tx = f.tg.x; f.ty = f.tg.y; }
+          const dx = f.tx - f.x, dy = f.ty - f.y, dist = Math.hypot(dx, dy), sp = Math.min(170, 120 + f.t * 10);   // the torpedo's pace
+          if (dist > 1) { const st = Math.min(dist, sp * dt); f.x += dx / dist * st; f.y += dy / dist * st; }
+          if (++f.tc % 4 === 0) { f.trail.unshift([f.x, f.y]); if (f.trail.length > 6) f.trail.length = 6; }
+          const touch = enemies.some(e => !e.dead && Math.hypot(e.x - f.x, e.y - f.y) < (e.hw || e.r || 16) + 10);
+          if (dist < 18 || touch || f.t > 6) { f.tx = f.x; f.ty = f.y; f.dur = f.t; }
+        }
         if (!f.burst && f.t >= f.dur) {
           f.burst = true;
           const R = S2.e_octo.r;
@@ -4102,11 +4110,11 @@ function makeShooter() {
         ctx.strokeStyle = `rgba(255,255,255,${0.8 * al})`; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(f.x, f.y, f.r - 5, 0, TAU); ctx.stroke();
       } else if (f.kind === 'inkball') {
-        const q = Math.min(1, f.t / f.dur), x = f.x0 + (f.tx - f.x0) * q, y = f.y0 + (f.ty - f.y0) * q - Math.sin(q * Math.PI) * 60;
+        const x = f.x, y = f.y;
         if (!f.burst) {
           const R = 14;   // half a 먹구름 hurricane
           ctx.fillStyle = 'rgba(16,6,30,0.35)'; ctx.beginPath(); ctx.ellipse(x + 5, y + 8, R, R * 0.6, 0, 0, TAU); ctx.fill();
-          for (let j = 1; j <= 3; j++) { const qq = Math.max(0, q - j * 0.06), tx = f.x0 + (f.tx - f.x0) * qq, ty = f.y0 + (f.ty - f.y0) * qq - Math.sin(qq * Math.PI) * 60; ctx.fillStyle = `rgba(20,8,38,${0.5 - j * 0.13})`; ctx.beginPath(); ctx.arc(tx, ty, R * (1 - j * 0.2), 0, TAU); ctx.fill(); }
+          for (let j = 1; j <= 3; j++) { const pt = f.trail[j * 2 - 1]; if (!pt) break; ctx.fillStyle = `rgba(20,8,38,${0.5 - j * 0.13})`; ctx.beginPath(); ctx.arc(pt[0], pt[1], R * (1 - j * 0.2), 0, TAU); ctx.fill(); }
           glowDot(x, y, R + 10, '150,90,240', 0.45);
           const g = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, R);
           g.addColorStop(0, '#3a1f66'); g.addColorStop(0.6, '#140824'); g.addColorStop(1, '#07030f');
