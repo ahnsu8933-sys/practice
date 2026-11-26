@@ -2606,14 +2606,12 @@ function drawTrumanPaperGlide(col, blink) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(-Math.PI / 2); tPoly([10, 0, -7, -6, -3, 0], col(acc[i])); tPoly([10, 0, -7, 6, -3, 0], P1); ctx.restore();
   }
 }
-// 트루먼 seen from behind, lying flat and flying head first (up the screen) with a freestyle stroke:
-// one arm reaches forward past the helmet while the other pulls back along the side, the legs flutter-kick
-// with their thrusters, the four wings spread from the back, and the backpack glows with the factory's light
+// Playable Truman flies head first with both fists forward and legs trailing behind.
 const TRUMAN_CRAFT_COLORS = ['#566bc4', '#354388', '#182853', '#151e3b', '#ffc373'];
 function drawTrumanBack(col, blink) {
-  const t = time, acc = tAcc(), stroke = Math.sin(t * 2.4);
+  const t = time, acc = tAcc(), bank = Math.sin(t * 2.4);
   const [W1, W2, W3, DK, TR] = TRUMAN_CRAFT_COLORS.map(col), opacity = ctx.globalAlpha;
-  const roll = stroke * 0.06;   // the body rolls a little with each stroke
+  const roll = bank * 0.035;
   ctx.save(); ctx.rotate(roll);
   // wings: spread out and back from the shoulder blades, beating gently
   for (let i = 0; i < 4; i++) {
@@ -2626,9 +2624,9 @@ function drawTrumanBack(col, blink) {
     ctx.beginPath(); ctx.moveTo(ox, oy - 6); ctx.lineTo(tx, ty); ctx.lineTo(ox, oy + 8); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = opacity;
   }
-  // legs trailing behind, flutter-kicking; thrusters at the feet blow backward
+  // Legs stay extended while the foot thrusters fire.
   for (const sd of [-1, 1]) {
-    const kick = Math.sin(t * 6 + (sd > 0 ? Math.PI : 0)), len = 66 + kick * 5, hx = sd * 10, hy = 22, fx = sd * 12 + kick * sd * 1.5, fy = hy + len;
+    const len = 66 + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
     const fl = 16 + Math.random() * 10, g = ctx.createLinearGradient(0, fy, 0, fy + fl);
     g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(fx - 7, fy); ctx.lineTo(fx, fy + fl); ctx.lineTo(fx + 7, fy); ctx.closePath(); ctx.fill();
@@ -2646,17 +2644,16 @@ function drawTrumanBack(col, blink) {
   }
   ctx.fillStyle = W3; for (let k = 0; k < 3; k++) ctx.fillRect(-10, -28 + k * 7, 20, 2.5);
   ctx.strokeStyle = TR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -46); ctx.lineTo(0, -36); ctx.moveTo(-28, -6); ctx.lineTo(-16, 24); ctx.moveTo(28, -6); ctx.lineTo(16, 24); ctx.stroke();
-  // arms: a freestyle stroke, one reaching forward while the other pulls back
+  // Both arms stay ahead of the shoulders, with the left fist leading.
   for (const sd of [-1, 1]) {
-    const f = (sd > 0 ? stroke : -stroke) * 0.5 + 0.5;            // 1 = reaching forward, 0 = pulled back
-    const th = (1 - f) * Math.PI, sx = sd * 36, sy = -40;
-    const ex = sx + sd * Math.sin(th) * 12, ey = sy - Math.cos(th) * 30;
-    const hx = ex + sd * Math.sin(th) * 6 - sd * f * 8, hy = ey - Math.cos(th) * 30;
+    const sx = sd * 36, sy = -40, lead = sd < 0;
+    const ex = sd * 32, ey = lead ? -71 : -61;
+    const hx = sd * (lead ? 24 : 29), hy = (lead ? -102 : -83) + bank * 1.2;
     ctx.lineCap = 'round';
     ctx.strokeStyle = W2; ctx.lineWidth = 12; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
     ctx.strokeStyle = W1; ctx.lineWidth = 11; ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.lineCap = 'butt';
-    ctx.fillStyle = W3; ctx.beginPath(); ctx.arc(hx, hy, 7, 0, TAU); ctx.fill();
+    ctx.fillStyle = W3; rr(hx - 7, hy - 7, 14, 14, 3); ctx.fill();
     ctx.fillStyle = DK; ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, TAU); ctx.fill();
     // shoulder armour seen from above
     tPoly([sd * 26, -54, sd * 50, -52, sd * 52, -34, sd * 28, -32], W1);
@@ -4825,14 +4822,15 @@ function makeShooter() {
     secFx.push({ kind: 'laser', x: sx, y: sy, a, t: 0, rgb });
   }
   function shockFrom(p, sc = 1) {
-    secFx.push({ kind: 'shock', x: p.x, y: p.y, r: 20 * sc, t: 0, hit: new Set(), sc });
+    const damageScale = P.id === 'e_truman' ? PLANES.find(plane => plane.id === 'ox').dmg * REFIT.ox : undefined;
+    secFx.push({ kind: 'shock', x: p.x, y: p.y, r: 20 * sc, t: 0, hit: new Set(), sc, damageScale });
     parts.push({ kind: 'ring', x: p.x, y: p.y, life: 0.3, max: 0.3, size: 60 * sc, color: sc < 1 ? '190,230,255' : '255,240,200' });
     shake = Math.max(shake, 0.2); boom(0.3, 0.12, 400);
   }
   // per-frame parts of the second weapons: owl moons, the beacon sweep, storm clouds
   function updateSec(dt) {
     const p = player, k = 0.8 + 0.1 * p.power, d = P.dmg;
-    // 해와 달, 올빼미 and 제비 carry the same shockwave as 황소, on the same timing
+    // 트루먼, 해와 달, 올빼미 and 제비 use 황소's full-size shockwave.
     if (P.id === 'e_truman') {
       const T = S2.e_truman, kS = 0.95 + 0.05 * p.power;
       secFx.tlT = (secFx.tlT === undefined ? 0.3 : secFx.tlT) - dt;
@@ -4840,8 +4838,8 @@ function makeShooter() {
       secFx.tzT = (secFx.tzT === undefined ? 0.55 : secFx.tzT) - dt;
       if (secFx.tzT <= 0) { secFx.tzT = T.zapCd; fireSatZap(1, T.zap * kS * d, T.rgbZ, new Set()); tone(1300 + Math.random() * 300, 0.06, 'sawtooth', 0.012, 500); }
     }
-    if (P.id === 'e_spider' || P.id === 'e_octo' || P.id === 'e_seed' || P.id === 'e_halo' || P.id === 'e_truman') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p, P.id === 'e_octo' ? 1 : 0.5); } }
-    if (P.id === 'c_twin' || P.id === 'owl' || P.id === 'swallow') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p); } }
+    if (P.id === 'e_spider' || P.id === 'e_octo' || P.id === 'e_seed' || P.id === 'e_halo') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p, P.id === 'e_octo' ? 1 : 0.5); } }
+    if (P.id === 'e_truman' || P.id === 'c_twin' || P.id === 'owl' || P.id === 'swallow') { secFx.shT = (secFx.shT === undefined ? 1 : secFx.shT) - dt; if (secFx.shT <= 0) { secFx.shT = S2.ox.cd; shockFrom(p); } }
     if (P.id === 'c_cloud') {
       secFx.vxT = (secFx.vxT === undefined ? 0.8 : secFx.vxT) - dt;
       if (secFx.vxT <= 0) {
@@ -4907,7 +4905,7 @@ function makeShooter() {
         f.r += S2.ox.speed * dt;
         for (const e of enemies.slice()) {
           if (e.dead || f.hit.has(e)) continue;
-          if (Math.abs(Math.hypot(e.x - f.x, e.y - f.y) - f.r) < (e.hw || e.r || 16) + 14) { f.hit.add(e); hitEnemy(e, S2.ox.dmg * k * d); spark(e.x, e.y, '255,220,150', 6, 180); }
+          if (Math.abs(Math.hypot(e.x - f.x, e.y - f.y) - f.r) < (e.hw || e.r || 16) + 14) { f.hit.add(e); hitEnemy(e, S2.ox.dmg * k * (f.damageScale ?? d)); spark(e.x, e.y, '255,220,150', 6, 180); }
         }
         if (f.r < S2.ox.radius * (f.sc || 1)) for (const b of eb) if (!b.hit && Math.hypot(b.x - f.x, b.y - f.y) < f.r) { b.hit = true; spark(b.x, b.y, '255,220,150', 2, 80); }
       } else if (f.kind === 'inkball') {
@@ -6570,7 +6568,7 @@ function makeShooter() {
       ctx.fillStyle = `rgba(255,235,190,${al * (1 - i / 11) * 0.8})`;
       ctx.beginPath(); ctx.arc(190 + Math.sin(i + t * 2) * 6, y + 50 + i * 14 + bob, Math.max(1, 4 - i * 0.25), 0, TAU); ctx.fill();
     }
-    drawPlane(190, y + bob, 0, 0, al, t * 40, Object.assign({}, c.look, { noShadow: true, scale: 2.2 }));
+    drawPlane(190, y + bob, 0, 0, al, t * 40, Object.assign({}, c.look, { noShadow: true, scale: 2.2, preview: gallery && c.id === 'e_truman' }));
   }
   function finalEndingScene(t, al) {
     const sy = 430 - Math.min(t, 6) * 18;
@@ -9443,7 +9441,7 @@ function endlessGalleryList() {
     radio('_tend', '작전 종료', [
       ['트루먼', epilogue.truman], ...epilogue.radio, [pilot.name, epilogue.reply[pilot.id]], epilogue.close,
     ], finished, '무한 모드 STAGE 84의 보스를 격파하면 열려요.'),
-    { kind: 'craft', id: craft.id, title: craft.ending.title, sky, look: craft.look, who: craft.name,
+    { kind: 'craft', id: craft.id, title: craft.ending.title, sky, look: { ...craft.look, preview: true }, who: craft.name,
       tag: '잔해 소탕 작전', line: craft.ending.text[0], seen: finished, hint: '무한 모드 STAGE 84의 보스를 격파하면 열려요.' },
   ];
 }
