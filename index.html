@@ -560,7 +560,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 /* title screen entrance. First visit: a take-off from the runway is drawn on the canvas, then the title slams in
    and the mode cards fly in (--o holds the menu back until the plane is gone). Back from a run: a quick version. A tap skips it. */
 #menuScr { --k: 1; --o: 0s; }
-#menuScr.full { --o: 2.15s; }
+#menuScr.full { --o: 1.98s; --k: 0.58; }
 #menuScr.quick { --k: 0.35; }
 #menuScr > .menu-inner { margin-top: auto; margin-bottom: auto; }
 .m-title { position: relative; }
@@ -570,8 +570,10 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 #menuScr::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,22,48,0.25) 0%, var(--panel) 40%, rgba(20,22,48,0.88) 100%); pointer-events: none; }
 #menuScr > .menu-inner { position: relative; z-index: 1; }
 #menuScr.intro.full::before { animation: mFade 0.8s calc(var(--o) - 0.3s) ease-out backwards; }
+.takeoff-skip { position: absolute; z-index: 4; top: 12px; right: 14px; padding: 6px 11px; color: #f6ecd9; background: rgba(15,20,45,0.72); border: 1px solid #b5b8d7; border-radius: 7px; font: 12px var(--body); cursor: pointer; }
 .m-flash { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.95), rgba(255,226,190,0.6) 35%, rgba(255,200,150,0) 70%); }
 #menuScr.intro .m-flash { animation: mFlash 0.45s calc(var(--o) + var(--k) * 0.4s) ease-out backwards; }
+#menuScr.intro.full .m-flash { animation: none; }
 /* cloud puffs burst out from behind the title when it lands */
 .m-burst { position: absolute; left: 50%; top: 50%; width: 0; height: 0; z-index: -1; pointer-events: none; }
 .m-burst i { position: absolute; left: -30px; top: -22px; width: 60px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, rgba(255,250,245,0.95), rgba(240,215,225,0.75) 45%, rgba(200,170,210,0) 72%); opacity: 0; }
@@ -587,8 +589,6 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 #menuScr.intro #modeList > * { animation: mFly 0.5s calc(var(--o) + var(--k) * (0.95s + var(--i, 0) * 0.11s)) cubic-bezier(.2,1.2,.4,1) backwards; }
 #menuScr.intro #modeList > .card::after { animation: mShine 0.8s calc(var(--o) + var(--k) * (1.35s + var(--i, 0) * 0.11s)) ease-out; }
 #menuScr.intro .menu-inner > p.small { animation: mFade 0.5s calc(var(--o) + var(--k) * 1.6s) ease-out backwards; }
-#menuScr.skip *, #menuScr.skip *::after, #menuScr.skip::before { animation: none !important; }
-#menuScr.skip .m-burst i, #menuScr.skip .m-flash { opacity: 0 !important; }
 @keyframes mType { from { letter-spacing: 0.9em; opacity: 0; filter: blur(3px); } to { opacity: 1; } }
 @keyframes mSlam { 0% { transform: scale(2.4); opacity: 0; filter: blur(6px); } 60% { transform: scale(0.94); opacity: 1; filter: none; } 100% { transform: scale(1); } }
 @keyframes mPuff { 0% { opacity: 0; transform: rotate(var(--a)) translateX(10px) scale(0.4); } 15% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(var(--s)); } }
@@ -648,6 +648,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 
     <div class="overlay" id="menuScr">
      <div class="m-flash" aria-hidden="true"></div>
+     <button type="button" class="takeoff-skip" id="takeoffSkip" hidden>건너뛰기</button>
      <div class="menu-inner" id="menuInner">
       <p class="eyebrow">고도 3,200m · 구름바다 상공</p>
       <h1 class="m-title"><span class="m-burst" id="mBurst" aria-hidden="true"></span><span class="m-l1">구름바다</span><br><span class="m-l2">요격전</span></h1>
@@ -6882,7 +6883,7 @@ function makeShooter() {
       b.fuse -= dt;
       if (b.fuse <= 0) {
         b.hit = true;
-        ring(b.x, b.y, 8, 150, rand(0, 1), 5, 1);
+        ring(b.x, b.y, b.burstCount ?? 8, b.burstSpeed ?? 150, rand(0, 1), 5, 1);
         spark(b.x, b.y, '255,190,120', 8, 160); boom(0.2, 0.08, 900);
       }
     }
@@ -7146,17 +7147,18 @@ function makeShooter() {
       e.fire2 -= fr;
       if (e.fire2 <= 0) { shootAt(e.x, e.y + 20, 210, e.phase2 ? 7 : 5, 0.16, 5, 0); e.fire2 = e.phase2 ? 1.0 : 1.2; tone(200, 0.08, 'square', 0.02, 120); }
       // 홀씨 융단 폭격: a line of seeds swoops in across the screen and bursts the moment it lands
-      e.carpetT = (e.carpetT === undefined ? 2 : e.carpetT) - fr;
+      e.carpetT = (e.carpetT === undefined ? 2.6 : e.carpetT) - fr;
       if (e.carpetT <= 0 && !player.dead) {
-        const n = e.phase2 ? 5 : 3, band = clamp(player.y + rand(-140, 40), H * 0.35, H - 60), dir = Math.random() < 0.5 ? 1 : -1;
-        const spacing = (W - 60) / Math.max(n - 1, 1);
+        const n = e.phase2 ? 3 : 2, band = clamp(player.y + rand(-140, 40), H * 0.35, H - 60), dir = Math.random() < 0.5 ? 1 : -1;
+        const fuse = 0.85, burstCount = e.phase2 ? 5 : 4, burstSpeed = e.phase2 ? 115 : 105;
+        const spacing = n === 2 ? W * 0.48 : (W - 60) / (n - 1);
         for (let i = 0; i < n; i++) later(i * 0.07, () => {
-          const tx = dir > 0 ? 30 + i * spacing : W - 30 - i * spacing, ty = band + rand(-30, 30), x0 = tx + rand(-40, 40), y0 = -12, fuse = 0.55;
-          eb.push({ x: x0, y: y0, vx: (tx - x0) / fuse, vy: (ty - y0) / fuse, r: 6, fuse, tint: '245,240,255' });
+          const tx = W / 2 + dir * (i - (n - 1) / 2) * spacing, ty = band + rand(-30, 30), x0 = tx + rand(-40, 40), y0 = -12;
+          eb.push({ x: x0, y: y0, vx: (tx - x0) / fuse, vy: (ty - y0) / fuse, r: 6, fuse, burstCount, burstSpeed, tint: '245,240,255' });
           if (i % 2 === 0) tone(1300 - i * 60, 0.05, 'triangle', 0.015, 600);
         });
-        later(0.6, () => { boom(0.5, 0.16, 900); shake = Math.max(shake, 0.25); });
-        e.carpetT = e.phase2 ? 3 : 3.6;
+        later(fuse, () => { boom(0.5, 0.16, 900); shake = Math.max(shake, 0.25); });
+        e.carpetT = e.phase2 ? 4.6 : 5.4;
       }
       if (e.phase2) {
         e.windT -= fr;
@@ -8266,6 +8268,7 @@ function drawFoePreview(canvas, type, type2) {
 }
 // title screen entrance (see the #menuScr.intro styles); full = first visit of this session
 let menuIntroT = null, introRun = null;
+const menuAudioTimers = [];
 const TAKEOFF = 3.4;
 function drawAirbase(hy, t) {
   const sil = '#1b1932', rim = 'rgba(255,190,140,0.55)';
@@ -8311,7 +8314,7 @@ function drawRadioCall(t) {
     { at: 0.05, who: '관제탑', col: '#9fd0ff', text: '새벽 편대, 활주로 정리 완료. 이륙을 허가한다.' },
     { at: 0.85, who: lead.pilot.name + ' · 1번기', col: lead.look.accent || '#ffb36b', text: '알았다. 새벽 편대, 출격!' },
   ];
-  const al = 1 - clamp((t - 1.85) / 0.35, 0, 1);
+  const al = 1 - clamp((t - 1.11) / 0.32, 0, 1);
   if (al <= 0) return;
   ctx.save(); ctx.globalAlpha = al * clamp(t / 0.25, 0, 1);
   const x = 24, w = W - 48, y = 64, h = 104;
@@ -8328,81 +8331,141 @@ function drawRadioCall(t) {
   });
   ctx.restore();
 }
-// runway in perspective; the plane rolls up it, lifts off (its shadow stays behind), climbs and vanishes with a glint
+// The camera stays behind the lead plane until the squadron breaks through the cloud layer.
 function drawTakeoff(t) {
-  const hy = H * 0.44, cx = W / 2;
-  const fade = 1 - clamp((t - 1.45) / 0.6, 0, 1);
-  const ease = x => x * x;
-  if (fade > 0) {
-    ctx.save(); ctx.globalAlpha = fade;
-    const g = ctx.createLinearGradient(0, hy, 0, H);
-    g.addColorStop(0, '#3a3456'); g.addColorStop(1, '#14152a');
-    ctx.fillStyle = g; ctx.fillRect(0, hy, W, H - hy);
-    ctx.fillStyle = 'rgba(255,200,150,0.25)'; ctx.fillRect(0, hy - 1, W, 2);   // horizon glow
-    drawAirbase(hy, t);
-    const wTop = 26, wBot = W * 0.95, X = (u, side) => cx + side * (wTop + (wBot - wTop) * u) / 2, Y = u => hy + (H - hy) * u;
-    ctx.fillStyle = '#2a2a3c';
-    ctx.beginPath(); ctx.moveTo(X(0, -1), Y(0)); ctx.lineTo(X(0, 1), Y(0)); ctx.lineTo(X(1, 1), Y(1)); ctx.lineTo(X(1, -1), Y(1)); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,240,220,0.7)'; ctx.lineWidth = 2;
-    for (const sd of [-1, 1]) { ctx.beginPath(); ctx.moveTo(X(0.02, sd * 0.92), Y(0.02)); ctx.lineTo(X(1, sd * 0.92), Y(1)); ctx.stroke(); }
-    // centre dashes stay put; the edge lights flash in sequence toward the horizon, leading the plane away
-    const chase = (t * 2.4) % 1;
-    for (let i = 0; i < 10; i++) {
-      const u0 = (i + 0.3) / 10, u1 = u0 + 0.04, a0 = u0 * u0, a1 = u1 * u1;
-      ctx.fillStyle = 'rgba(255,240,215,0.85)';
-      ctx.beginPath(); ctx.moveTo(cx - 1 - 3 * a0, Y(a0)); ctx.lineTo(cx + 1 + 3 * a0, Y(a0)); ctx.lineTo(cx + 1 + 3 * a1, Y(a1)); ctx.lineTo(cx - 1 - 3 * a1, Y(a1)); ctx.fill();
-      const lit = Math.abs((1 - u0) - chase) < 0.08 ? 1 : 0;
-      for (const sd of [-1, 1]) glowDot(X(a0, sd * 1.06), Y(a0), (3 + 9 * a0) * (1 + lit * 0.9), lit ? '255,250,230' : '255,190,110', 0.55 + 0.45 * lit);
+  const cx = W / 2;
+  const roll = clamp((t - 0.12) / 1.16, 0, 1);
+  const lift = clamp((t - 0.84) / 0.67, 0, 1);
+  const climb = lift * lift * (3 - 2 * lift);
+  const hy = H * (0.43 + 0.29 * climb);
+  const runway = 1 - clamp((t - 1.18) / 0.38, 0, 1);
+  const reveal = clamp((t - 1.34) / 0.52, 0, 1);
+  const blend = 1 - clamp((t - 2.72) / (TAKEOFF - 2.72), 0, 1);
+  const lead = PLANES[App.setup.plane] || PLANES[1];
+
+  if (reveal > 0 && blend > 0) {
+    ctx.save(); ctx.globalAlpha = reveal * blend;
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#252e61');
+    g.addColorStop(0.43, '#9a597f');
+    g.addColorStop(0.68, '#f5b18c');
+    g.addColorStop(1, '#4c4b7d');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sx = W * 0.67, sy = H * 0.49;
+    glowDot(sx, sy, W * 0.42, '255,195,145', 0.8);
+    ctx.fillStyle = '#ffd7a4';
+    ctx.beginPath(); ctx.arc(sx, sy, W * 0.061, 0, TAU); ctx.fill();
+    for (let row = 0; row < 2; row++) {
+      for (let i = 0; i < 7; i++) {
+        const x = (i - 0.6) * W / 5.2 - (t - 1.7) * (9 + 13 * row);
+        const y = H * (0.67 + 0.15 * row) + Math.sin(i * 1.7 + row) * 21;
+        glowDot(x, y, W * (0.24 + row * 0.13), row ? '208,163,191' : '255,222,195', 0.64);
+      }
     }
     ctx.restore();
   }
-  // the plane: rolls (0.3-1.25 s), lifts off and climbs (to ~1.95 s), shrinking toward the horizon
-  const p = ease(clamp((t - 0.3) / 1.65, 0, 1));
-  const py = (H - 150) + ((hy - 150) - (H - 150)) * p, sc = 1.35 + (0.06 - 1.35) * p;
-  const lift = clamp((p - 0.3) / 0.4, 0, 1);
-  if (fade > 0 && p < 0.95) {   // the shadow stays on the runway and falls behind once airborne
-    const sy = (H - 120) + ((hy + 8) - (H - 120)) * Math.min(1, p * 1.1);
-    ctx.fillStyle = 'rgba(0,0,0,' + (0.35 * (1 - lift) * fade) + ')';
-    ctx.beginPath(); ctx.ellipse(cx, sy + lift * 30 * sc, 46 * sc, 14 * sc, 0, 0, TAU); ctx.fill();
-  }
-  if (p < 1 && t < 2.05) {
-    const al = 1 - clamp((t - 1.85) / 0.2, 0, 1);
-    glowDot(cx, py + 46 * sc, (26 + 30 * Math.min(1, t)) * sc, '255,150,70', 0.85 * al);   // afterburner
-    ctx.save(); ctx.translate(cx, py - lift * 10 * sc); ctx.scale(sc, sc);
-    drawPlane(0, 0, 0, Math.sin(t * 7) * 0.05 * lift, al, menuProp, Object.assign({}, withLivery(PLANES[App.setup.plane] || PLANES[1]).look, { noShadow: true }));
+
+  if (runway > 0) {
+    ctx.save(); ctx.globalAlpha = runway;
+    const ground = ctx.createLinearGradient(0, hy, 0, H);
+    ground.addColorStop(0, '#392d55'); ground.addColorStop(1, '#15182c');
+    ctx.fillStyle = ground; ctx.fillRect(0, hy, W, H - hy);
+    drawAirbase(hy, t);
+    const X = (u, side) => cx + side * (24 + (W * 0.94 - 24) * u) / 2;
+    const Y = u => hy + (H - hy) * u;
+    ctx.fillStyle = '#282b44';
+    ctx.beginPath(); ctx.moveTo(X(0, -1), hy); ctx.lineTo(X(0, 1), hy);
+    ctx.lineTo(X(1, 1), H); ctx.lineTo(X(1, -1), H); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,219,182,0.66)'; ctx.lineWidth = 1.6;
+    for (const side of [-1, 1]) {
+      ctx.beginPath(); ctx.moveTo(X(0, side), hy); ctx.lineTo(X(1, side), H); ctx.stroke();
+    }
+    const travel = 0.14 * roll + 1.38 * roll * roll;
+    const ready = clamp((t + 0.08) * 1.7, 0, 1);
+    for (let i = 0; i < 11; i++) {
+      const z = (i / 11 + travel) % 1, u = z * z;
+      const z1 = Math.min(1, z + 0.038 + roll * 0.023), v = z1 * z1;
+      ctx.fillStyle = 'rgba(255,240,220,0.7)';
+      ctx.beginPath(); ctx.moveTo(cx - 1 - 3 * u, Y(u)); ctx.lineTo(cx + 1 + 3 * u, Y(u));
+      ctx.lineTo(cx + 1 + 3 * v, Y(v)); ctx.lineTo(cx - 1 - 3 * v, Y(v)); ctx.fill();
+      const lit = z > 1 - ready;
+      for (const side of [-1, 1]) {
+        const x = X(u, side * 1.06), y = Y(u);
+        glowDot(x, y, 3 + 13 * u, lit ? '255,202,116' : '142,132,188', lit ? 0.9 : 0.3);
+      }
+    }
     ctx.restore();
   }
-  // then the rest of the dawn squadron crosses the sky in formation, trailing contrails
-  if (t > 1.9) {
-    const others = PLANES.filter((pl, i) => i !== App.setup.plane).slice(0, 3);
-    others.forEach((pl, i) => {
-      const q = clamp((t - 1.9 - i * 0.12) / 1.3, 0, 1);
-      if (q <= 0 || q >= 1) return;
-      const x0 = -60 + i * 34, y0 = hy + 170 + i * 26, x1 = W + 80 + i * 34, y1 = hy - 300 + i * 26;
-      const x = x0 + (x1 - x0) * q, y = y0 + (y1 - y0) * q, ang = Math.atan2(y1 - y0, x1 - x0) + Math.PI / 2;
-      const cg = ctx.createLinearGradient(x, y, x - (x1 - x0) * 0.3, y - (y1 - y0) * 0.3);
-      cg.addColorStop(0, 'rgba(255,250,240,0.75)'); cg.addColorStop(1, 'rgba(255,250,240,0)');
-      ctx.strokeStyle = cg; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - (x1 - x0) * 0.3, y - (y1 - y0) * 0.3); ctx.stroke();
-      ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(0.42, 0.42);
-      drawPlane(0, 0, 0, 0, 1, menuProp, Object.assign({}, pl.look, { noShadow: true }));
+
+  if (t < 1.85) {
+    const opacity = 1 - clamp((t - 1.49) / 0.36, 0, 1);
+    const x = cx + climb * W * 0.075, y = H * (0.77 - roll * 0.12 - climb * 0.16);
+    const scale = 1 - roll * 0.19 + climb * 0.34;
+    if (runway > 0 && climb < 1) {
+      ctx.fillStyle = 'rgba(13,13,27,' + 0.4 * (1 - climb) * runway + ')';
+      ctx.beginPath(); ctx.ellipse(x, y + 29 + climb * 70, 47 * scale, 12 * scale, 0, 0, TAU); ctx.fill();
+    }
+    ctx.save(); ctx.globalAlpha = opacity;
+    const exhaust = ctx.createLinearGradient(x, y + 19, x, y + 116 * scale);
+    exhaust.addColorStop(0, 'rgba(255,250,220,0.9)'); exhaust.addColorStop(0.3, 'rgba(255,148,80,0.7)');
+    exhaust.addColorStop(1, 'rgba(255,120,100,0)');
+    ctx.fillStyle = exhaust;
+    ctx.beginPath(); ctx.ellipse(x, y + 48 * scale, 6 + 5 * roll, 34 * scale, 0, 0, TAU); ctx.fill();
+    glowDot(x, y + 31 * scale, (18 + roll * 28) * scale, '255,156,85', 0.86);
+    ctx.translate(x, y); ctx.scale(scale, scale);
+    drawPlane(0, 0, climb * 0.14, climb * -0.19, opacity, menuProp, { ...withLivery(lead).look, noShadow: true });
+    ctx.restore();
+  }
+
+  if (t > 1.71 && blend > 0) {
+    const p = clamp((t - 1.71) / 1.45, 0, 1);
+    const fade = clamp(p * 6, 0, 1) * blend;
+    const formation = [lead, ...PLANES.filter(plane => plane !== lead)];
+    formation.forEach((plane, i) => {
+      const side = i === 0 ? 0 : i % 2 ? -1 : 1, rank = Math.ceil(i / 2);
+      const x = W * (0.48 + p * 0.58) + side * rank * (40 - 12 * p);
+      const y = H * (0.57 - p * 0.53) + rank * (47 - p * 20);
+      const sc = (i === 0 ? 0.66 : 0.54) * (1 - p * 0.56);
+      const trail = ctx.createLinearGradient(x, y, x - 90, y + 126);
+      trail.addColorStop(0, 'rgba(255,244,219,' + 0.82 * fade + ')');
+      trail.addColorStop(1, 'rgba(255,218,195,0)');
+      ctx.strokeStyle = trail; ctx.lineWidth = 3.6 - p * 1.8;
+      for (const wing of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(x + wing * 11 * sc, y + 9);
+        ctx.quadraticCurveTo(x - 45, y + 77, x - 90, y + 126); ctx.stroke();
+      }
+      ctx.save(); ctx.translate(x, y); ctx.rotate(0.50); ctx.scale(sc, sc);
+      drawPlane(0, 0, 0, 0, fade, menuProp, { ...withLivery(plane).look, noShadow: true });
       ctx.restore();
     });
   }
-  drawRadioCall(t);
-  // glint where it vanishes
-  const gl = clamp(1 - Math.abs(t - 2.02) / 0.22, 0, 1);
-  if (gl > 0) {
-    const gx = cx, gy = hy - 150, r = 34 * gl;
-    glowDot(gx, gy, r * 1.6, '255,230,180', gl);
-    ctx.strokeStyle = 'rgba(255,250,235,' + gl + ')'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(gx - r * 1.8, gy); ctx.lineTo(gx + r * 1.8, gy); ctx.moveTo(gx, gy - r); ctx.lineTo(gx, gy + r); ctx.stroke();
+
+  const cloud = clamp((t - 0.97) / 0.43, 0, 1) * (1 - clamp((t - 1.57) / 0.56, 0, 1));
+  if (cloud > 0) {
+    const sweep = (t - 1.48) * H * 1.55;
+    ctx.save(); ctx.globalAlpha = cloud;
+    for (let i = 0; i < (LITE ? 6 : 10); i++) {
+      const side = i % 2 ? 1 : -1;
+      const x = cx + side * (W * 0.17 + Math.abs(t - 1.48) * W * 0.48);
+      const y = H * (0.12 + Math.floor(i / 2) * (LITE ? 0.33 : 0.20)) + sweep;
+      glowDot(x, y, W * (0.58 + i % 3 * 0.07), i % 3 ? '220,214,233' : '255,230,201', 0.86);
+    }
+    ctx.restore();
   }
+  drawRadioCall(t);
+}
+function finishMenuIntro() {
+  clearTimeout(menuIntroT);
+  while (menuAudioTimers.length) clearTimeout(menuAudioTimers.pop());
+  introRun = null;
+  $('menuScr').classList.remove('intro', 'quick', 'full');
+  $('menuInner').inert = false;
+  $('takeoffSkip').hidden = true;
 }
 function playMenuIntro(full) {
   const m = $('menuScr');
-  if (!m || !m.classList) return;
-  clearTimeout(menuIntroT);
+  finishMenuIntro();
+  if (reduceMotion) return;
   const list = $('modeList');
   if (list && list.children) [...list.children].forEach((el, i) => { if (el.style && el.style.setProperty) el.style.setProperty('--i', i); });
   const burst = $('mBurst');
@@ -8415,27 +8478,29 @@ function playMenuIntro(full) {
     p.style.setProperty('--j', j % 4);
     burst.append(p);
   }
-  m.classList.remove('intro', 'quick', 'full', 'skip');
-  const calm = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (calm) { introRun = null; return; }
-  if (m.offsetWidth !== undefined) void m.offsetWidth;
+  void m.offsetWidth;
   m.classList.add('intro', full ? 'full' : 'quick');
-  introRun = full ? { t: 0 } : null;
-  const o = full ? 2.15 : 0, k = full ? 1 : 0.35, at = (sec, fn) => setTimeout(fn, sec * 1000);
+  if (full) {
+    introRun = { started: performance.now(), t: 0 };
+    $('menuInner').inert = true;
+    $('takeoffSkip').hidden = false;
+  }
+  const at = (sec, fn) => menuAudioTimers.push(setTimeout(() => { if (App.mode === 'menu') fn(); }, sec * 1000));
   if (actx && actx.state === 'running' && !muted) {
     if (full) {
-      // engine spool-up, roll, lift-off whoosh, the glint, the formation passing
-      tone(60, 1.7, 'sawtooth', 0.035, 240); boom(1.6, 0.08, 420);
-      at(0.3, () => tone(120, 1.3, 'square', 0.012, 480));
-      at(0.85, () => boom(0.7, 0.14, 2600));
-      at(2.0, () => chime());
-      at(2.05, () => { boom(1.0, 0.09, 1500); tone(340, 0.9, 'sawtooth', 0.014, 110); });
+      tone(62, 1.15, 'sawtooth', 0.029, 220);
+      at(0.38, () => tone(100, 0.82, 'triangle', 0.024, 310));
+      at(0.91, () => boom(0.63, 0.09, 2400));
+      at(1.54, () => boom(0.48, 0.055, 1800));
+      at(2.18, () => tone(523, 0.18, 'triangle', 0.043));
+      at(2.30, () => tone(659, 0.20, 'triangle', 0.045));
+      at(2.42, () => tone(784, 0.38, 'triangle', 0.045));
+    } else {
+      at(0.14, () => { boom(0.4, 0.18, 520); tone(100, 0.3, 'square', 0.035, 50); });
+      at(0.21, () => { boom(0.3, 0.12, 700); tone(130, 0.22, 'square', 0.03, 65); });
     }
-    at(o + k * 0.4, () => { boom(0.4, 0.18, 520); tone(100, 0.3, 'square', 0.035, 50); });
-    at(o + k * 0.6, () => { boom(0.3, 0.12, 700); tone(130, 0.22, 'square', 0.03, 65); });
   }
-  at(o + k * 0.4, () => { shake = Math.max(shake, full ? 0.45 : 0.2); });
-  menuIntroT = setTimeout(() => m.classList.remove('intro', 'quick', 'full'), 1000 * (o + k * 2.4));
+  menuIntroT = setTimeout(finishMenuIntro, 1000 * (full ? TAKEOFF : 0.84));
 }
 const briefTimers = [];
 function stopBrief() { while (briefTimers.length) clearTimeout(briefTimers.pop()); }
@@ -9117,6 +9182,11 @@ window.addEventListener('keydown', e => {
   if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); }
   const m = App.mode;
   if (m === 'menu') {
+    if (introRun && !e.repeat && ['Enter', 'Space', 'Escape'].includes(e.code)) {
+      e.preventDefault();
+      finishMenuIntro();
+      return;
+    }
     const d = ['Digit1', 'Digit2', 'Digit3', 'Numpad1', 'Numpad2', 'Numpad3'].indexOf(e.code);
     if (d >= 0 && !e.repeat) App.chooseMode(d % 3);
     if (e.code === 'ArrowUp' || e.code === 'KeyW') App.selMode(App.menuSel - 1);
@@ -9502,7 +9572,10 @@ $('crBackBtn').addEventListener('click', () => App.openEndlessHangar());
 $('logTabCal').addEventListener('click', () => setLogTab('cal'));
 $('logTabRw').addEventListener('click', () => setLogTab('reward'));
 $('logTabShow').addEventListener('click', () => setLogTab('show'));
-$('menuScr').addEventListener('pointerdown', () => { const m = $('menuScr'); if (m.classList.contains('intro')) { m.classList.add('skip'); introRun = null; } });
+$('menuScr').addEventListener('pointerdown', e => {
+  if (e.target !== $('takeoffSkip') && $('menuScr').classList.contains('intro')) finishMenuIntro();
+});
+$('takeoffSkip').addEventListener('click', finishMenuIntro);
 // first open: take off right away. Sound plays only where the device allows audio before a tap (e.g. the packaged app);
 // in a browser the context would stay paused, so it is closed again and sound starts with the first tap as before
 try {
@@ -9567,7 +9640,10 @@ function update(dt) {
   shake = Math.max(0, shake - dt);
   flashT = Math.max(0, flashT - dt);
   if (App.mode === 'menu' || App.mode === 'setup' || App.mode === 'daily' || App.mode === 'pick' || App.mode === 'log' || App.mode === 'craft') { updateSky(dt); updateParts(dt); menuProp += dt * 40; }
-  if (introRun) { introRun.t += dt; if (introRun.t > TAKEOFF || App.mode !== 'menu') introRun = null; }
+  if (introRun) {
+    introRun.t = (performance.now() - introRun.started) / 1000;
+    if (introRun.t > TAKEOFF || App.mode !== 'menu') finishMenuIntro();
+  }
   hurtFx = Math.max(0, hurtFx - dt);
   if (App.mode === 'play' && !tipOn) { if (hitStop > 0) hitStop -= dt; else { App.game.update(dt); updateParts(dt); } }
   else if (App.mode === 'over' || App.mode === 'continue' || App.mode === 'hangar' || App.mode === 'rule' || App.mode === 'gallery') { updateSky(dt, 0.4); updateParts(dt); }
@@ -9578,8 +9654,11 @@ function draw() {
   if (App.mode === 'menu' || !App.game) {
     drawSkyBack();
     if (introRun && App.mode === 'menu') drawTakeoff(introRun.t);
-    else drawPlane(W / 2 + Math.sin(time * 0.8) * 70, H - 120 + Math.sin(time * 1.3) * 12, 0, Math.cos(time * 0.8) * 0.6, 1, menuProp);
-    if (!introRun || introRun.t > 1.6) drawSkyFront();
+    const idle = introRun ? clamp((introRun.t - 2.72) / (TAKEOFF - 2.72), 0, 1) : 1;
+    if (idle > 0) {
+      drawPlane(W / 2 + Math.sin(time * 0.8) * 70, H - 120 + Math.sin(time * 1.3) * 12, 0, Math.cos(time * 0.8) * 0.6, idle, menuProp);
+      ctx.globalAlpha = idle; drawSkyFront();
+    }
   } else {
     App.game.draw();
   }
