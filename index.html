@@ -4972,15 +4972,8 @@ function makeShooter() {
     for (let i = 0; i < 2; i++) {
       const [x, y] = satPos(i), heading = time * 2.4 + (i + 1) * Math.PI;
       const look = PLANES[i ? 3 : 1].look;
-      const rim = i ? '#e7cbff' : '#ffd17d';
-      ctx.save();
-      ctx.beginPath(); ctx.arc(x, y, 15.5, 0, TAU);
-      ctx.fillStyle = 'rgba(18,19,42,0.9)'; ctx.fill();
-      ctx.strokeStyle = '#12142d'; ctx.lineWidth = 3.8; ctx.stroke();
-      ctx.strokeStyle = rim; ctx.lineWidth = 1.45; ctx.stroke();
-      ctx.restore();
       drawPlane(x, y, heading, 0, 1, time * 40, {
-        ...look, noShadow: true, scale: i ? 0.34 : 0.36, accent: rim,
+        ...look, noShadow: true, scale: i ? 0.34 : 0.36, accent: i ? '#e7cbff' : '#ffd17d',
         wing: i ? '#9868ff' : '#ff8b31', body: i ? '#f0e3ff' : '#ffe8ba',
       });
     }
