@@ -4962,6 +4962,23 @@ function makeShooter() {
     }
     for (let i = secFx.length - 1; i >= 0; i--) { const f = secFx[i]; if ((f.kind === 'sweep' && f.t > f.dur) || (f.kind === 'cloud' && f.t > 0.9) || (f.kind === 'shock' && f.r > S2.ox.reach * (f.sc || 1)) || (f.kind === 'laser' && f.t > 0.22) || (f.kind === 'inkball' && f.t > f.dur + 0.3) || (f.kind === 'thread' && (f.t > f.dur || f.tg.dead))) secFx.splice(i, 1); }
   }
+  function drawTrumanSatellites() {
+    for (let i = 0; i < 2; i++) {
+      const [x, y] = satPos(i), heading = time * 2.4 + (i + 1) * Math.PI;
+      const look = PLANES[i ? 3 : 1].look;
+      const rim = i ? '#e7cbff' : '#ffd17d';
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, 15.5, 0, TAU);
+      ctx.fillStyle = 'rgba(18,19,42,0.9)'; ctx.fill();
+      ctx.strokeStyle = '#12142d'; ctx.lineWidth = 3.8; ctx.stroke();
+      ctx.strokeStyle = rim; ctx.lineWidth = 1.45; ctx.stroke();
+      ctx.restore();
+      drawPlane(x, y, heading, 0, 1, time * 40, {
+        ...look, noShadow: true, scale: i ? 0.34 : 0.36, accent: rim,
+        wing: i ? '#9868ff' : '#ff8b31', body: i ? '#f0e3ff' : '#ffe8ba',
+      });
+    }
+  }
   function drawSec() {
     const p = player;
     if (P.id === 'owl') for (let i = 0; i < 2; i++) {
@@ -4980,12 +4997,6 @@ function makeShooter() {
       else { ctx.fillStyle = '#fff3d6'; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(8, -4); ctx.lineTo(6, 6); ctx.lineTo(0, 9); ctx.lineTo(-6, 6); ctx.lineTo(-8, -4); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = `rgba(${rgb},0.5)`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, S2.c_fortress.guard, 0, TAU); ctx.stroke(); }
       ctx.restore();
-    }
-    if (P.id === 'e_truman') for (let i = 0; i < 2; i++) {
-      const [sx, sy] = satPos(i), a = time * 2.4 + (i + 1) * Math.PI, rgb = i ? S2.e_truman.rgbZ : S2.e_truman.rgbL;
-      const plane = PLANES[i ? 3 : 1];
-      glowDot(sx, sy, 16, rgb, 0.5);
-      drawPlane(sx, sy, a, 0, 1, time * 40, { ...plane.look, noShadow: true, scale: i ? 0.25 : 0.27 });
     }
     for (const f of secFx) {
       if (f.kind === 'laser') {
@@ -7996,7 +8007,11 @@ function makeShooter() {
       if (ult) drawUlt();
       if (!player.dead) {
         const blink = player.inv > 0 && !scene && !ult && Math.floor(player.inv * 14) % 2 === 0;
-        drawPlane(player.x, player.y, 0, player.tilt, blink ? 0.35 : 1, player.prop, P.look);
+        const truman = P.id === 'e_truman';
+        const heading = truman && !reduceMotion ? player.tilt * 0.14 : 0;
+        const tilt = truman ? player.tilt * 0.55 : player.tilt;
+        drawPlane(player.x, player.y, heading, tilt, blink ? 0.35 : 1, player.prop, P.look);
+        if (truman && camp.act === 4) drawTrumanSatellites();
         const mini = (type, x, y, sc) => { ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); drawEnemy({ type, x: 0, y: 0, t: 0, flash: 0, hp: 1, maxHp: 1, k: 0, craft: true, rot: Math.PI }); ctx.restore(); };
         if (P.weapon === 'net') for (let i = 0; i < 2; i++) { const [bx, by] = babyPos(i); mini('spider', bx, by, 0.12); }
         if (P.id === 'e_seed' && camp.act === 4) for (let i = 0; i < 3; i++) { const [sx, sy] = seedSatPos(i); glowDot(sx, sy, 14, '240,236,255', 0.35); mini('seed', sx, sy, 0.13); }
