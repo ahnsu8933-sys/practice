@@ -1899,7 +1899,10 @@ function drawCraft(L) {
 function craftPortrait(c, x, y, r) {
   ctx.save();
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = '#232844'; ctx.fill(); ctx.clip();
-  drawPlane(x, y + 2, 0, 0, 1, time * 40, Object.assign({}, c.look, { noShadow: true, scale: r / 44, preview: true }));
+  const truman = c.id === 'e_truman';
+  drawPlane(x, truman ? y - r * 0.06 : y + 2, 0, 0, 1, time * 40, Object.assign({}, c.look, {
+    noShadow: true, scale: r / (truman ? 48 : 44), preview: true,
+  }));
   ctx.restore();
   ctx.strokeStyle = c.look.accent; ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(x, y, r - 1, 0, TAU); ctx.stroke();
@@ -2607,7 +2610,8 @@ function drawTrumanPaperGlide(col, blink) {
   }
 }
 // Playable Truman flies head first with both fists forward and legs trailing behind.
-const TRUMAN_CRAFT_COLORS = ['#566bc4', '#354388', '#182853', '#151e3b', '#ffc373'];
+const TRUMAN_CRAFT_COLORS = ['#f5f0e3', '#3864e8', '#263f91', '#172653', '#ffc373'];
+const TRUMAN_CRAFT_LEG_SCALE = 1.25;
 function drawTrumanBack(col, blink) {
   const t = time, acc = tAcc(), bank = Math.sin(t * 2.4);
   const [W1, W2, W3, DK, TR] = TRUMAN_CRAFT_COLORS.map(col), opacity = ctx.globalAlpha;
@@ -2626,7 +2630,7 @@ function drawTrumanBack(col, blink) {
   }
   // Legs stay extended while the foot thrusters fire.
   for (const sd of [-1, 1]) {
-    const len = 66 + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
+    const len = 66 * TRUMAN_CRAFT_LEG_SCALE + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
     const fl = 16 + Math.random() * 10, g = ctx.createLinearGradient(0, fy, 0, fy + fl);
     g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(fx - 7, fy); ctx.lineTo(fx, fy + fl); ctx.lineTo(fx + 7, fy); ctx.closePath(); ctx.fill();
@@ -2637,7 +2641,9 @@ function drawTrumanBack(col, blink) {
   }
   // the back: shoulders wide, tapering to the waist, a spine ridge, vents and the backpack with two glowing nozzles
   tPoly([-34, -46, 34, -46, 28, -6, 16, 24, -16, 24, -28, -6], W1);
-  tPoly([-34, -46, 0, -46, 0, 24, -16, 24, -28, -6], W2);
+  for (const sd of [-1, 1]) {
+    tPoly([sd * 14, -46, sd * 34, -46, sd * 28, -6, sd * 16, 24, sd * 9, 17], W2);
+  }
   ctx.fillStyle = DK; rr(-14, -34, 28, 34, 5); ctx.fill();
   for (const sd of [-1, 1]) {
     ctx.fillStyle = '#83e5ff'; ctx.beginPath(); ctx.arc(sd * 7, 2, 3 + 0.6 * blink, 0, TAU); ctx.fill();
@@ -2656,7 +2662,7 @@ function drawTrumanBack(col, blink) {
     ctx.fillStyle = W3; rr(hx - 7, hy - 7, 14, 14, 3); ctx.fill();
     ctx.fillStyle = DK; ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, TAU); ctx.fill();
     // shoulder armour seen from above
-    tPoly([sd * 26, -54, sd * 50, -52, sd * 52, -34, sd * 28, -32], W1);
+    tPoly([sd * 26, -54, sd * 50, -52, sd * 52, -34, sd * 28, -32], W2);
     tPoly([sd * 30, -53, sd * 47, -52, sd * 48, -46, sd * 31, -47], TR);
     ctx.fillStyle = TR; ctx.fillRect(sd > 0 ? 30 : -52, -36, 22, 2.5);
   }
@@ -2787,7 +2793,8 @@ function drawEnemy(e) {
   if (e.elite) glowDot(e.x, e.y, (e.r || 16) * 2.4, '255,210,90', 0.5 + 0.2 * Math.sin(time * 8));
   ctx.translate(e.x, e.y);
   if (e.rot) ctx.rotate(e.rot);
-  const col = base => e.flash > 0 ? '#ffffff' : e.craft ? lightHex(base) : base;
+  const soften = e.craft && e.type !== 'truman' && e.type !== 'truman_back';
+  const col = base => e.flash > 0 ? '#ffffff' : soften ? lightHex(base) : base;
   const blink = 0.6 + 0.4 * Math.sin(time * 8 + e.x);
   const hurt = e.maxHp ? 1 - e.hp / e.maxHp : 0;
   if (e.type === 'scout') {
@@ -3206,7 +3213,9 @@ function drawEnemy(e) {
     }
     // legs: thighs, knee guards, heavy shins, blocky feet; each sways a little at the hip, its thruster with it
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(sd * 14, 22); ctx.rotate(Math.sin(pose * 1.3 + sd * 1.2) * 0.07); ctx.translate(-sd * 14, -22);
+      ctx.save(); ctx.translate(sd * 14, 22);
+      if (e.craft) ctx.scale(1, TRUMAN_CRAFT_LEG_SCALE);
+      ctx.rotate(Math.sin(pose * 1.3 + sd * 1.2) * 0.07); ctx.translate(-sd * 14, -22);
       const fl = 14 + Math.random() * 8, g = ctx.createLinearGradient(0, 92, 0, 92 + fl);
       g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(sd * 15 - 7, 92); ctx.lineTo(sd * 15, 92 + fl); ctx.lineTo(sd * 15 + 7, 92); ctx.closePath(); ctx.fill();
@@ -3246,8 +3255,8 @@ function drawEnemy(e) {
     // shoulder armour: big angled blocks with three vents
     for (const sd of [-1, 1]) {
       ctx.save(); ctx.translate(0, Math.sin(time * 1.5 + sd * 1.3) * 1.6);
-      poly([sd * 28, -54, sd * 58, -50, sd * 62, -30, sd * 36, -28], W1);
-      poly([sd * 28, -54, sd * 58, -50, sd * 57, -44, sd * 30, -47], W2);
+      poly([sd * 28, -54, sd * 58, -50, sd * 62, -30, sd * 36, -28], e.craft ? W2 : W1);
+      poly([sd * 28, -54, sd * 58, -50, sd * 57, -44, sd * 30, -47], e.craft ? W1 : W2);
       ctx.fillStyle = DK; for (let k = 0; k < 3; k++) ctx.fillRect(sd > 0 ? 40 + k * 6 : -44 - k * 6, -42, 3, 10);
       ctx.fillStyle = TR; ctx.fillRect(sd > 0 ? 36 : -62, -30, 26, 2.5);
       ctx.restore();
@@ -3913,7 +3922,7 @@ const ENDLESS_CRAFTS = [
   { id: 'e_truman', type: 'truman', name: '트루먼', ga: '을', title: '인간형 복제체', speed: 320, hp: 6, dmg: 1.2, hit: 4,
     weapon: 'mimic', weaponName: '흉내 사격', bomb: 'mimic', bombName: '기억 복제', ult: 'human', ultName: '사람의 비행',
     story: '사람이 되고 싶어 조종사를 흉내 내던 마지막 복제체. 6초마다 조종사 4명의 무기를 차례로 바꿔 써요.', unlockLine: '"트루먼, 편대 합류."',
-    look: { kind: 'craft', type: 'truman', art: 0.36, accent: '#ffc373', scale: 1 }, stats: [4, 4, 5],
+    look: { kind: 'craft', type: 'truman', art: 0.40, accent: '#ffc373', scale: 1 }, stats: [4, 4, 5],
     ending: { title: '사람의 하늘', sky: ['#1a2350', '#6b5a9e', '#ffc8a0'], text: [
       '복제 공장의 잔해는 둥지가 되고, 씨앗이 되고, 달이 되어 자기들의 하늘을 세우려 했다.',
       '그 하늘 아래에서 태어난 하나는, 빌린 목소리를 내려놓고 함께 날기를 골랐다.',
