@@ -570,7 +570,6 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 #menuScr::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,22,48,0.25) 0%, var(--panel) 40%, rgba(20,22,48,0.88) 100%); pointer-events: none; }
 #menuScr > .menu-inner { position: relative; z-index: 1; }
 #menuScr.intro.full::before { animation: mFade 0.8s calc(var(--o) - 0.3s) ease-out backwards; }
-.takeoff-skip { position: absolute; z-index: 4; top: 12px; right: 14px; padding: 6px 11px; color: #f6ecd9; background: rgba(15,20,45,0.72); border: 1px solid #b5b8d7; border-radius: 7px; font: 12px var(--body); cursor: pointer; }
 .m-flash { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,0.95), rgba(255,226,190,0.6) 35%, rgba(255,200,150,0) 70%); }
 #menuScr.intro .m-flash { animation: mFlash 0.45s calc(var(--o) + var(--k) * 0.4s) ease-out backwards; }
 #menuScr.intro.full .m-flash { animation: none; }
@@ -648,7 +647,6 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
 
     <div class="overlay" id="menuScr">
      <div class="m-flash" aria-hidden="true"></div>
-     <button type="button" class="takeoff-skip" id="takeoffSkip" hidden>건너뛰기</button>
      <div class="menu-inner" id="menuInner">
       <p class="eyebrow">고도 3,200m · 구름바다 상공</p>
       <h1 class="m-title"><span class="m-burst" id="mBurst" aria-hidden="true"></span><span class="m-l1">구름바다</span><br><span class="m-l2">요격전</span></h1>
@@ -2611,9 +2609,10 @@ function drawTrumanPaperGlide(col, blink) {
 // 트루먼 seen from behind, lying flat and flying head first (up the screen) with a freestyle stroke:
 // one arm reaches forward past the helmet while the other pulls back along the side, the legs flutter-kick
 // with their thrusters, the four wings spread from the back, and the backpack glows with the factory's light
+const TRUMAN_CRAFT_COLORS = ['#566bc4', '#354388', '#182853', '#151e3b', '#ffc373'];
 function drawTrumanBack(col, blink) {
   const t = time, acc = tAcc(), stroke = Math.sin(t * 2.4);
-  const W1 = col('#eceaf3'), W2 = col('#c3c0d2'), W3 = col('#8f8ba6'), DK = col('#3a3852'), TR = col('#7a52c8');
+  const [W1, W2, W3, DK, TR] = TRUMAN_CRAFT_COLORS.map(col), opacity = ctx.globalAlpha;
   const roll = stroke * 0.06;   // the body rolls a little with each stroke
   ctx.save(); ctx.rotate(roll);
   // wings: spread out and back from the shoulder blades, beating gently
@@ -2621,10 +2620,11 @@ function drawTrumanBack(col, blink) {
     const sd = i < 2 ? -1 : 1, up = i % 2 === 0, len = up ? 100 : 78;
     const a = (up ? -0.12 : 0.42) + Math.sin(t * 1.8 + (up ? 0 : 0.7)) * 0.12, ox = sd * 16, oy = up ? -30 : -16;
     const tx = ox + sd * Math.cos(a) * len, ty = oy + Math.sin(a) * len;
-    const g = ctx.createLinearGradient(ox, oy, tx, ty); g.addColorStop(0, W2); g.addColorStop(1, col(acc[i]));
-    ctx.globalAlpha = 0.95; ctx.fillStyle = g;
+    const g = ctx.createLinearGradient(ox, oy, tx, ty);
+    g.addColorStop(0, W2); g.addColorStop(0.47, col(acc[i])); g.addColorStop(1, col(acc[i]));
+    ctx.globalAlpha = opacity * 0.95; ctx.fillStyle = g;
     ctx.beginPath(); ctx.moveTo(ox, oy - 6); ctx.lineTo(tx, ty); ctx.lineTo(ox, oy + 8); ctx.closePath(); ctx.fill();
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = opacity;
   }
   // legs trailing behind, flutter-kicking; thrusters at the feet blow backward
   for (const sd of [-1, 1]) {
@@ -2641,7 +2641,9 @@ function drawTrumanBack(col, blink) {
   tPoly([-34, -46, 34, -46, 28, -6, 16, 24, -16, 24, -28, -6], W1);
   tPoly([-34, -46, 0, -46, 0, 24, -16, 24, -28, -6], W2);
   ctx.fillStyle = DK; rr(-14, -34, 28, 34, 5); ctx.fill();
-  for (const sd of [-1, 1]) { glowDot(sd * 7, 2, 7, '190,120,255', 0.6 + 0.4 * blink); ctx.fillStyle = '#f3ecff'; ctx.beginPath(); ctx.arc(sd * 7, 2, 2.2, 0, TAU); ctx.fill(); }
+  for (const sd of [-1, 1]) {
+    ctx.fillStyle = '#83e5ff'; ctx.beginPath(); ctx.arc(sd * 7, 2, 3 + 0.6 * blink, 0, TAU); ctx.fill();
+  }
   ctx.fillStyle = W3; for (let k = 0; k < 3; k++) ctx.fillRect(-10, -28 + k * 7, 20, 2.5);
   ctx.strokeStyle = TR; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -46); ctx.lineTo(0, -36); ctx.moveTo(-28, -6); ctx.lineTo(-16, 24); ctx.moveTo(28, -6); ctx.lineTo(16, 24); ctx.stroke();
   // arms: a freestyle stroke, one reaching forward while the other pulls back
@@ -2658,6 +2660,7 @@ function drawTrumanBack(col, blink) {
     ctx.fillStyle = DK; ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, TAU); ctx.fill();
     // shoulder armour seen from above
     tPoly([sd * 26, -54, sd * 50, -52, sd * 52, -34, sd * 28, -32], W1);
+    tPoly([sd * 30, -53, sd * 47, -52, sd * 48, -46, sd * 31, -47], TR);
     ctx.fillStyle = TR; ctx.fillRect(sd > 0 ? 30 : -52, -36, 22, 2.5);
   }
   // the helmet from behind, pointing forward: a rounded back, the crest running along the top, the antennae swept back
@@ -3187,7 +3190,7 @@ function drawEnemy(e) {
     if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.22)'; ctx.beginPath(); ctx.ellipse(18, 104, 74, 18, 0, 0, TAU); ctx.fill(); }
     const pose = e.choicePose ?? time, opacity = ctx.globalAlpha;
     const bob = Math.sin(pose * 1.6) * 3, acc = PLANES.map(p => p.look.accent);
-    const W1 = col('#eceaf3'), W2 = col('#c3c0d2'), W3 = col('#8f8ba6'), DK = col('#3a3852'), TR = col('#7a52c8');
+    const [W1, W2, W3, DK, TR] = (e.craft ? TRUMAN_CRAFT_COLORS : ['#eceaf3', '#c3c0d2', '#8f8ba6', '#3a3852', '#7a52c8']).map(col);
     const poly = (pts, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); };
     ctx.save(); ctx.translate(0, bob);
     // wings: four thin blades from the back, one per pilot colour
@@ -3913,7 +3916,7 @@ const ENDLESS_CRAFTS = [
   { id: 'e_truman', type: 'truman', name: '트루먼', ga: '을', title: '인간형 복제체', speed: 320, hp: 6, dmg: 1.2, hit: 4,
     weapon: 'mimic', weaponName: '흉내 사격', bomb: 'mimic', bombName: '기억 복제', ult: 'human', ultName: '사람의 비행',
     story: '사람이 되고 싶어 조종사를 흉내 내던 마지막 복제체. 6초마다 조종사 4명의 무기를 차례로 바꿔 써요.', unlockLine: '"트루먼, 편대 합류."',
-    look: { kind: 'craft', type: 'truman', art: 0.36, accent: '#e8e8f0', scale: 1 }, stats: [4, 4, 5],
+    look: { kind: 'craft', type: 'truman', art: 0.36, accent: '#ffc373', scale: 1 }, stats: [4, 4, 5],
     ending: { title: '사람의 하늘', sky: ['#1a2350', '#6b5a9e', '#ffc8a0'], text: [
       '복제 공장의 잔해는 둥지가 되고, 씨앗이 되고, 달이 되어 자기들의 하늘을 세우려 했다.',
       '그 하늘 아래에서 태어난 하나는, 빌린 목소리를 내려놓고 함께 날기를 골랐다.',
@@ -8460,7 +8463,6 @@ function finishMenuIntro() {
   introRun = null;
   $('menuScr').classList.remove('intro', 'quick', 'full');
   $('menuInner').inert = false;
-  $('takeoffSkip').hidden = true;
 }
 function playMenuIntro(full) {
   const m = $('menuScr');
@@ -8483,7 +8485,6 @@ function playMenuIntro(full) {
   if (full) {
     introRun = { started: performance.now(), t: 0 };
     $('menuInner').inert = true;
-    $('takeoffSkip').hidden = false;
   }
   const at = (sec, fn) => menuAudioTimers.push(setTimeout(() => { if (App.mode === 'menu') fn(); }, sec * 1000));
   if (actx && actx.state === 'running' && !muted) {
@@ -9572,10 +9573,9 @@ $('crBackBtn').addEventListener('click', () => App.openEndlessHangar());
 $('logTabCal').addEventListener('click', () => setLogTab('cal'));
 $('logTabRw').addEventListener('click', () => setLogTab('reward'));
 $('logTabShow').addEventListener('click', () => setLogTab('show'));
-$('menuScr').addEventListener('pointerdown', e => {
-  if (e.target !== $('takeoffSkip') && $('menuScr').classList.contains('intro')) finishMenuIntro();
+$('menuScr').addEventListener('pointerdown', () => {
+  if ($('menuScr').classList.contains('intro')) finishMenuIntro();
 });
-$('takeoffSkip').addEventListener('click', finishMenuIntro);
 // first open: take off right away. Sound plays only where the device allows audio before a tap (e.g. the packaged app);
 // in a browser the context would stay paused, so it is closed again and sound starts with the first tap as before
 try {
