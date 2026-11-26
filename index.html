@@ -605,6 +605,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
   background: rgba(255, 154, 74, 0.12); border: 1px dashed var(--flare); border-radius: 10px; cursor: pointer;
 }
 .gallery { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 420px; }
+#galleryInner button[aria-pressed="true"].ghost { border-color: #9fb0e0; color: #f6ecd9; }
 .gcard { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 4px 4px 6px; color: var(--ink); font: 11px var(--body); background: var(--card); border: 1px solid var(--card-line); border-radius: 10px; cursor: pointer; }
 .gcard canvas { width: 100%; height: auto; aspect-ratio: 160 / 100; border-radius: 7px; display: block; }
 .gcard b { font: 12px var(--display); font-weight: 400; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -663,7 +664,7 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
         <div class="card-sub info" id="attackInfo" hidden><b>최근 기록</b><span id="attackInfoText"></span></div>
         <button class="card" id="mode1" type="button"><span class="card-key">2</span><span class="card-body"><b>스토리 모드</b><span>돌아오지 않은 편대의 이야기. 33스테이지, 엔딩 16개예요.</span></span><span class="card-best">엔딩<strong><span id="endCount">0</span>/16</strong></span></button>
         <button class="card-sub" id="resumeRunBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="runInfo"></span></button>
-        <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
+        <button class="card" id="mode2" type="button"><span class="card-key">3</span><span class="card-body"><b>무한 모드</b><span id="endlessDesc">최종 엔딩을 보면 열려요.</span><span id="endlessRadioHint" hidden>들은 무전은 엔딩 갤러리에서 다시 볼 수 있어요.</span></span><span class="card-best" id="endlessBestBox">잠김</span></button>
         <button class="card-sub" id="resumeEndlessBtn" type="button" hidden><b>▶ 이어서 출격</b><span id="erunInfo"></span></button>
       </div>
       <p class="small"><span class="kbd-hint">↑↓ 고르기 · Enter 시작<span id="resumeKeyHint" hidden> · R 이어서</span> · </span>스토리 최고 <span id="best-shooter">0</span> <button class="linkbtn" id="galleryBtn" type="button">엔딩 갤러리</button></p>
@@ -817,6 +818,10 @@ h2 { font-size: clamp(32px, 7.5vmin, 50px); }
      <div class="menu-inner" id="galleryInner">
       <p class="eyebrow" id="galleryCount">엔딩 0 / 16</p>
       <h2>엔딩 갤러리</h2>
+      <div class="actions" role="group" aria-label="갤러리 분류">
+        <button class="btn ghost" id="galleryStory" type="button">스토리</button>
+        <button class="btn ghost" id="galleryEndless" type="button">잔해 소탕 작전</button>
+      </div>
       <div class="gallery" id="galleryList"></div>
       <div class="pinfo" id="galleryInfo"></div>
       <div class="actions">
@@ -871,7 +876,7 @@ const DEV = (() => {
   try {
     if (!DEV_TOOLS || typeof location === 'undefined') return {};
     const q = new URLSearchParams(location.search), st = parseInt(q.get('stage'), 10);
-    return { stage: st >= 34 && st < 1000 ? st : 0, unlockAll: q.get('unlock') === 'all' };
+    return { stage: st >= 34 && st < 1000 ? st : 0, unlockAll: q.get('unlock') === 'all', resetTruman: st >= 34 && st < 1000 && q.get('reset') === 'truman' };
   } catch (e) { return {}; }
 })();
 (() => {
@@ -977,8 +982,11 @@ const Save = (() => {
     deviceId: () => d.dev,
     eUnlocked: id => !!d.eunlock[id],
     eUnlock(id) { if (!d.eunlock[id]) { d.eunlock[id] = true; write(); } },
-    eSeen: id => !!d.eseen[id],
-    markESeen(id) { if (!d.eseen[id]) { d.eseen[id] = true; write(); } },
+    eSeen: id => !!d.eseen[id] && !(id === '_tend' && DEV.resetTruman),
+    markESeen(id) {
+      if (id === '_tend') DEV.resetTruman = false;
+      if (!d.eseen[id]) { d.eseen[id] = true; write(); }
+    },
     daily: date => d.daily[date] || null,
     dailyCfg: date => (d.daily[date] && d.daily[date].cfg) || null,
     setDailyCfg(date, cfg) { const r = d.daily[date] || (d.daily[date] = { best: 0, done: [false, false, false], plays: 0 }); r.cfg = cfg; write(); },
@@ -2747,10 +2755,13 @@ function drawFactory(e, col, blink, hurt) {
 }
 let shadeCv = null, inShade = false;
 function shadowGlow(e) { glowDot(e.x, e.y, (e.hw || e.r || 30) * 1.7, '150,80,255', 0.35 + 0.15 * Math.sin(time * 5)); }
-function drawShadowed(list) {
+function drawShadowed(list, echo = false) {
   const main = ctx, cvs = main.canvas;
   if (!(cvs && cvs.width > 0) || typeof main.getTransform !== 'function') { for (const e of list) drawEnemy(e); return; }
-  for (const e of list) shadowGlow(e);
+  for (const e of list) {
+    if (echo) glowDot(e.x, e.y, (e.hw || e.r || 30) * 1.7, '185,200,225', 0.22 + 0.16 * Math.sin(time * 9 + e.x));
+    else shadowGlow(e);
+  }
   if (!shadeCv) shadeCv = document.createElement('canvas');
   if (shadeCv.width !== cvs.width || shadeCv.height !== cvs.height) { shadeCv.width = cvs.width; shadeCv.height = cvs.height; }
   const o = shadeCv.getContext('2d'), t = main.getTransform();
@@ -2760,9 +2771,14 @@ function drawShadowed(list) {
   try { for (const e of list) drawEnemy(e); } finally { inShade = false; ctx = main; }
   // one darkening pass over the whole layer, only where the bosses were drawn
   o.setTransform(1, 0, 0, 1, 0, 0); o.globalCompositeOperation = 'source-atop';
-  o.fillStyle = 'rgba(22,19,34,0.7)'; o.fillRect(0, 0, cvs.width, cvs.height);
+  o.fillStyle = echo ? 'rgba(115,121,139,0.28)' : 'rgba(22,19,34,0.7)'; o.fillRect(0, 0, cvs.width, cvs.height);
   o.globalCompositeOperation = 'source-over';
-  main.save(); main.setTransform(1, 0, 0, 1, 0, 0); main.drawImage(shadeCv, 0, 0); main.restore();
+  main.save(); main.setTransform(1, 0, 0, 1, 0, 0);
+  if (echo) {
+    main.filter = 'saturate(0.6)';
+    main.globalAlpha *= 0.91 + 0.06 * Math.sin(time * 11);
+  }
+  main.drawImage(shadeCv, 0, 0); main.restore();
 }
 function drawEnemy(e) {
   ctx.save();
@@ -3168,25 +3184,28 @@ function drawEnemy(e) {
     // a crested helmet, fists and thruster legs. Its face is still a blank mirror that shows the sky,
     // its four thin wings carry the four pilots' colours, and the factory's light still glows in its chest.
     if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.22)'; ctx.beginPath(); ctx.ellipse(18, 104, 74, 18, 0, 0, TAU); ctx.fill(); }
-    const bob = Math.sin(time * 1.6) * 3, acc = PLANES.map(p => p.look.accent);
+    const pose = e.choicePose ?? time, opacity = ctx.globalAlpha;
+    const bob = Math.sin(pose * 1.6) * 3, acc = PLANES.map(p => p.look.accent);
     const W1 = col('#eceaf3'), W2 = col('#c3c0d2'), W3 = col('#8f8ba6'), DK = col('#3a3852'), TR = col('#7a52c8');
     const poly = (pts, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); };
     ctx.save(); ctx.translate(0, bob);
     // wings: four thin blades from the back, one per pilot colour
     for (let i = 0; i < 4; i++) {
       const sd = i < 2 ? -1 : 1, up = i % 2 === 0, len = up ? 104 : 80, a0 = sd > 0 ? (up ? -0.55 : -0.05) : Math.PI - (up ? -0.55 : -0.05);
-      const sw = Math.sin(time * 1.8 + (up ? 0 : 0.7)) * 0.17 + Math.sin(time * 3.1 + i) * 0.03, ox = sd * 22, oy = -40;
+      const sw = Math.sin(pose * 1.8 + (up ? 0 : 0.7)) * 0.17 + Math.sin(pose * 3.1 + i) * 0.03, ox = sd * 22, oy = -40;
       const tx = ox + Math.cos(a0 + sd * sw) * len, ty = oy + Math.sin(a0 + sd * sw) * len;
       const gw = ctx.createLinearGradient(ox, oy, tx, ty);
       gw.addColorStop(0, W2); gw.addColorStop(1, col(acc[i]));
+      const wingAlpha = 1 - clamp((e.choiceFade || 0) * 5 - i, 0, 1);
+      ctx.globalAlpha = opacity * wingAlpha;
       if (e.mimic === i) glowDot(tx, ty, 26, hexRgb(acc[i]), 0.55 + 0.35 * blink);
-      ctx.globalAlpha = e.mimic === undefined || e.mimic === i ? 0.95 : 0.55; ctx.fillStyle = gw;
+      ctx.globalAlpha *= e.mimic === undefined || e.mimic === i ? 0.95 : 0.55; ctx.fillStyle = gw;
       ctx.beginPath(); ctx.moveTo(ox, oy - 5); ctx.lineTo(tx, ty); ctx.lineTo(ox + sd * 8, oy + 9); ctx.closePath(); ctx.fill();
-      ctx.globalAlpha = 1;
+      ctx.globalAlpha = opacity;
     }
     // legs: thighs, knee guards, heavy shins, blocky feet; each sways a little at the hip, its thruster with it
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(sd * 14, 22); ctx.rotate(Math.sin(time * 1.3 + sd * 1.2) * 0.07); ctx.translate(-sd * 14, -22);
+      ctx.save(); ctx.translate(sd * 14, 22); ctx.rotate(Math.sin(pose * 1.3 + sd * 1.2) * 0.07); ctx.translate(-sd * 14, -22);
       const fl = 14 + Math.random() * 8, g = ctx.createLinearGradient(0, 92, 0, 92 + fl);
       g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(sd * 15 - 7, 92); ctx.lineTo(sd * 15, 92 + fl); ctx.lineTo(sd * 15 + 7, 92); ctx.closePath(); ctx.fill();
@@ -3203,7 +3222,7 @@ function drawEnemy(e) {
     for (const sd of [-1, 1]) poly([sd * 12, 12, sd * 26, 14, sd * 27, 34, sd * 15, 32], W2);
     // arms: upper arm, elbow, forearm, fist (a little away from the body)
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(sd * 46, -32); ctx.rotate(sd * (Math.sin(time * 1.5 + sd * 1.3) * 0.13 + 0.03)); ctx.translate(-sd * 46, 32);
+      ctx.save(); ctx.translate(sd * 46, -32); ctx.rotate(sd * (Math.sin(pose * 1.5 + sd * 1.3) * 0.13 + 0.03)); ctx.translate(-sd * 46, 32);
       poly([sd * 40, -34, sd * 52, -30, sd * 50, -6, sd * 40, -8], W2);
       ctx.fillStyle = DK; ctx.beginPath(); ctx.arc(sd * 46, -5, 6, 0, TAU); ctx.fill();
       poly([sd * 38, -2, sd * 56, 0, sd * 54, 26, sd * 40, 26], W1);
@@ -3220,7 +3239,7 @@ function drawEnemy(e) {
     ctx.strokeStyle = TR; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(-30, -16); ctx.lineTo(-18, 6); ctx.moveTo(30, -16); ctx.lineTo(18, 6); ctx.stroke();
     ctx.fillStyle = DK; ctx.beginPath(); for (let k = 0; k < 6; k++) { const q = k / 6 * TAU + Math.PI / 6; ctx.lineTo(Math.cos(q) * 9, -10 + Math.sin(q) * 9); } ctx.closePath(); ctx.fill();
-    const breath = (Math.sin(time * 2.2) + 1) / 2;
+    const breath = (Math.sin(pose * 2.2) + 1) / 2;
     glowDot(0, -10, (e.mimic !== undefined ? 18 : 12) + breath * 5, e.mimic !== undefined ? hexRgb(acc[e.mimic]) : '190,120,255', 0.5 + 0.3 * breath + 0.2 * blink);
     ctx.fillStyle = '#f3ecff'; ctx.beginPath(); ctx.arc(0, -10, 3.5, 0, TAU); ctx.fill();
     // shoulder armour: big angled blocks with three vents
@@ -3860,6 +3879,12 @@ const TRUMAN_MIMIC = [
   '만든… 사람이… 책임져야지.',
   '언…니… 거기… 있는… 거지.',
 ];
+const TRUMAN_FIRST_MIMIC = [
+  '내가… 제일… 빠르니까. …그런데 엄마는… 기다려 주지 않았잖아.',
+  '이번엔… 다… 데리고… 돌아간다. …저번처럼, 혼자서?',
+  '만든… 사람이… 책임져야지. …나도, 누가 만들었잖아.',
+  '언…니… 거기… 있는… 거지. …나도, 여기 있어.',
+];
 const TRUMAN_CARD = ['사람이 되고 싶었던 기체.', '누구의 목소리도 아닌 자기 목소리로, 처음 무전을 보낸다.', '"트루먼, 편대 합류."'];
 const eBossById = id => ENDLESS_BOSSES.find(b => b.id === id);
 const eBossArt = id => (eBossById(id) ? eBossById(id).stand : id);
@@ -3889,9 +3914,9 @@ const ENDLESS_CRAFTS = [
     story: '사람이 되고 싶어 조종사를 흉내 내던 마지막 복제체. 6초마다 조종사 4명의 무기를 차례로 바꿔 써요.', unlockLine: '"트루먼, 편대 합류."',
     look: { kind: 'craft', type: 'truman', art: 0.36, accent: '#e8e8f0', scale: 1 }, stats: [4, 4, 5],
     ending: { title: '사람의 하늘', sky: ['#1a2350', '#6b5a9e', '#ffc8a0'], text: [
-      '복제 공장이 남긴 것들은 끝내 하늘을 갖고 싶었을 뿐이었다.',
-      '잔해는 둥지가 되고, 씨앗이 되고, 달이 되고, 마침내 사람을 닮았다.',
-      '이제 그 하늘은 함께 난다. 새벽 편대의 다섯 번째 날개로.'] } },
+      '복제 공장의 잔해는 둥지가 되고, 씨앗이 되고, 달이 되어 자기들의 하늘을 세우려 했다.',
+      '그 하늘 아래에서 태어난 하나는, 빌린 목소리를 내려놓고 함께 날기를 골랐다.',
+      '새벽 편대의 다섯 번째 날개, 트루먼.'] } },
 ];
 // the endless story on the radio. debut: shown once as a scene; again: one line, without stopping play; down: the boss's last signal
 const ENDLESS_TALK = {
@@ -3936,13 +3961,29 @@ const ENDLESS_TALK = {
   },
   epilogue: {
     truman: '…이건… 흉내가 아니야. 내… 목소리야.',
-    radio: [['관제탑', '신호 정리 완료. 문어, 거미, 민들레, 달… 전부 공장 잔해에서 시작된 하나의 신호였다.'],
-      ['정비반', '부서진 것들이 모여서 사람처럼 날고 싶었던 거군. …우리처럼.']],
+    radio: [['관제탑', '신호 분석 완료. 저장된 무전이 아니다. …처음 듣는 문장이다.'],
+      ['정비반', '문어, 거미, 민들레, 달. 다들 우리 하늘을 빼앗으려 했다. 그런데 저 녀석 하나는… 다른 걸 골랐군.']],
     reply: { narae: '그럼 같이 날자. 흉내 말고, 네 날개로.', maru: '편대에 빈자리가 하나 있다. 네 이름으로 채워라, 트루먼.',
       bawi: '설계한 놈이 없으면 내가 고쳐 주마. 이번엔 사람이 함께 지킨다.', saebyeok: '언니도 이런 마음이었을까. 괜찮아, 이제 혼자 날지 않아도 돼.' },
     close: ['관제탑', '잔해 소탕 작전, 종료. …새벽 편대, 귀환하라.'],
   },
   down: { octo: '…치직… 삐…… 삐.', spider: '…집… 우리… 집…', seed: '…피어… 다시… 피어…', halo: '…우리… 하늘… 꺼진다… 왜…', truman: '…나도… 날고… 싶었어.' },
+  echo: {
+    octo: ['구름문어는 우리 격납고에 있다. 저건 잔해에 남은 옛 신호가 만든 껍데기다.', '주인 없는 다리가 아직도 잔해를 끌어모은다.'],
+    spider: ['스파이더 옛 신호. 주인 없는 둥지가 아직 실을 뽑는다.', '실은 끊겨도 신호는 남는 모양이군.'],
+    seed: ['민들레 옛 신호. 이미 흩어진 씨앗이 뒤늦게 자랐다.', '뿌리는 뽑았는데, 바람이 아직 씨앗을 나른다.'],
+    halo: ['달무리 옛 신호. 꺼진 달의 잔광이 다시 고리를 돌린다.', '진짜 달무리는 지금 우리 밤길을 비추고 있다.'],
+    truman: ['트루먼은 우리 편대에 있다. 저건 트루먼이 내려놓은 목소리들이다.', '빌린 목소리만 남아서 아직도 우리 흉내를 낸다.'],
+  },
+  echoSelf: {
+    octo: '(잡음) …내 잔해. 내가 정리할게.', spider: '…그 집, 이제 안 지어도 돼.',
+    seed: '…피지 마. 이번엔 내가 불어 낼게.', halo: '…우리 하늘은 이제, 여기야.', truman: '…안녕, 예전의 나.',
+  },
+  echoTruman: ['…저건 내가 아니야. 내가 버린 흉내야.', '내 목소리는 여기 있어. 저기 말고.'],
+  echoDown: {
+    octo: '옛 신호 소멸. 잔해가 다시 가라앉는다.', spider: '옛 신호 소멸. 빈 둥지의 실이 끊겼다.',
+    seed: '옛 신호 소멸. 씨앗이 더 날지 않는다.', halo: '옛 신호 소멸. 가짜 달이 진다.', truman: '옛 신호 소멸. 빌린 목소리가 하나 더 조용해졌다.',
+  },
 };
 const PART2 = {
   intro: [['관제탑', '폭풍눈의 기록에서 새 신호가 잡혔다. 구름바다 밑바닥, 무한 복제 공장.'],
@@ -4108,11 +4149,20 @@ function makeShooter() {
   };
   const bspd = () => Math.max(1.1 + 0.03 * grow(), 1.19 + 0.012 * grow()) * D.bullet * (hasRule('fast') ? 1.25 : 1) * (1 + lateK());
   const bossParts = () => enemies.filter(e => e.isBoss && !e.dead);
+  function currentPilotIndex() {
+    const index = PLANES.findIndex(plane => plane.pilot.id === P.pilot?.id);
+    return index >= 0 ? index : PLANES[camp.orig] ? camp.orig : 0;
+  }
+  let trumanChoice = null;
+  const TRUMAN_STOP = 1.5, TRUMAN_LINE = 1.8, TRUMAN_PATH = 3.25, TRUMAN_FADE = 4.65, TRUMAN_END = 5.45;
   const turretsLeft = () => enemies.some(o => o.type === 'turret' && !o.dead);
   const later = (delay, fn) => timers.push({ t: delay, fn });
   const storyOn = () => camp.act === 1 && !camp.attack;
-  const bNm = (k, nb) => (nb ? nb.name : BOSS_INFO[k].name);
-  const bossLabel = () => bossDuo ? bNm(bossKind, bossNew) + ' + 그림자 ' + bNm(bossDuo, duoNew) + ' 연합' : (bossShadow ? '그림자 ' : '') + (bossNew ? bossNew.title + ' ' + bossNew.name : BOSS_INFO[bossKind].title + ' ' + BOSS_INFO[bossKind].name);
+  const bNm = (k, nb) => nb?.echo ? nb.name + '의 옛 신호' : nb ? nb.name : BOSS_INFO[k].name;
+  const bossLabel = () => bossDuo
+    ? bNm(bossKind, bossNew) + ' + ' + (duoNew?.echo ? '' : '그림자 ') + bNm(bossDuo, duoNew) + ' 연합'
+    : bossNew?.echo ? bNm(bossKind, bossNew)
+      : (bossShadow ? '그림자 ' : '') + (bossNew ? bossNew.title + ' ' + bossNew.name : BOSS_INFO[bossKind].title + ' ' + BOSS_INFO[bossKind].name);
   function addScore(n, x, y) {
     const v = Math.round(n * D.score * scoreMul());
     score += v;
@@ -4132,7 +4182,7 @@ function makeShooter() {
   function advanceScene() {
     if (!scene) return;
     const ln = scene.lines[scene.i];
-    if (scene.t * 45 < ln.text.length) { scene.t = 999; return; }
+    if (!gallery && scene.t * 45 < ln.text.length) { scene.t = 999; return; }
     scene.i++; scene.t = 0;
     tone(520, 0.04, 'triangle', 0.03);
     if (scene.i >= scene.lines.length) {
@@ -4318,7 +4368,9 @@ function makeShooter() {
   function spawnBoss() {
     bossSpawned = true;
     bossItemT = 6; escortT = 1; heavyT = 6;
-    const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null; bossNew = sb.nb || null; duoNew = null;
+    // Keep the encounter's identity even if this victory unlocks a craft.
+    const encounter = nb => nb ? { ...nb, echo: Save.eUnlocked(nb.craft) && !(nb.id === 'truman' && DEV.resetTruman) } : null;
+    const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null; bossNew = encounter(sb.nb); duoNew = null;
     const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1)
       * (camp.act === 4 && !camp.attack ? 1.15 : 1);   // endless: second weapons hit harder, so bosses hold a little longer
     // endless: every third stage from 43, two bosses at once (the second one a shadow)
@@ -4329,7 +4381,7 @@ function makeShooter() {
     const tag = (n0, nb) => { for (let i = n0; i < enemies.length; i++) enemies[i].nb = nb; };
     if (camp.act === 4 && ei() >= 57 && (ei() - 41) % 3 === 2 && !sb.debut && rest.length) {
       const b = rest[Math.floor(Math.random() * rest.length)];
-      bossKind = eBossArt(a); bossNew = eBossById(a) || null; bossDuo = eBossArt(b); duoNew = eBossById(b) || null;
+      bossKind = eBossArt(a); bossNew = encounter(eBossById(a)); bossDuo = eBossArt(b); duoNew = encounter(eBossById(b));
       let n0 = enemies.length; buildBoss(bossKind, m * 0.62, -1, false); tag(n0, bossNew);
       n0 = enemies.length; buildBoss(bossDuo, m * 0.62, 1, true); tag(n0, duoNew);
     } else { const n0 = enemies.length; buildBoss(bossKind, m, 0, bossShadow); tag(n0, bossNew); }
@@ -4367,7 +4419,9 @@ function makeShooter() {
         legHp: Math.round(70 * m), sweepT: 1.4, sweepI: -1, stepT: 0, sweepDir: 1, fireT: 2.2, inkT: 2, score: 6000 });
       for (let i = 0; i < 8; i++) body.legE[i] = octoLeg(body, i);
     } else if (bossKind === 'truman') {
-      mk('truman', 1300, { x: W / 2, y: -120, hw: 40, hh: 70, r: 50, mimic: undefined, mimicT: 0, shotT: 0.6, burst: 0, burstT: 0, score: 9000 });
+      // The arrival radio records the encounter before Truman starts copying weapons.
+      const firstMimicLine = !Save.eSeen('truman') && !Save.eSeen('_tend') && !Save.eUnlocked('e_truman');
+      mk('truman', 1300, { x: W / 2, y: -120, hw: 40, hh: 70, r: 50, mimic: undefined, mimicT: 0, shotT: 0.6, burst: 0, burstT: 0, score: 9000, firstMimicLine });
     } else if (bossKind === 'seed') {
       mk('seed', 1050, { x: W / 2, y: -110, r: 46, mm: m, seedT: 1.6, fireT: 2.4, fire2: 1.4, windT: 3, gust: 0, gdir: 1, tough: 0, score: 6500 });
     } else if (bossKind === 'halo') {
@@ -4384,10 +4438,11 @@ function makeShooter() {
     }
   }
   // 민들레's seeds: they drift to a spot, then sprout into small craft unless shot first (at most 6 grown at once)
+  const SEED_GROW = 2;
   function seedPod(b, x, y, tx, ty) {
     const mm = b.mm || 1;
     enemies.push({ type: 'seedpod', x, y, tx, ty, hp: Math.round(4 * mm), maxHp: Math.round(4 * mm), budHp: Math.round(16 * mm), r: 11, t: 0, mt: 0, flash: 0, dead: false,
-      grow: 2.4, grow0: 2.4, ph: rand(0, TAU), score: 40, drop: 0.02, shadow: b.shadow });
+      grow: SEED_GROW, grow0: SEED_GROW, ph: rand(0, TAU), score: 40, drop: 0.02, shadow: b.shadow });
   }
   function updateSeedling(e, dt, fr) {
     if (e.type === 'seedpod') {
@@ -4431,9 +4486,16 @@ function makeShooter() {
   }
   // 잔해 소탕 작전: a new boss met for the first time gets its radio as a scene; after that one line that does not stop play.
   // The five kept bosses get one line the first time they are met in endless.
+  function echoLine(id, lines) {
+    const last = camp.echoLast ??= {};
+    let i = Math.floor(stageNo / 10) % lines.length;
+    if (i === last[id]) i = (i + 1) % lines.length;
+    last[id] = i;
+    return lines[i];
+  }
   function endlessTalk() {
     const T = ENDLESS_TALK;
-    if (bossNew && !bossDuo && !Save.eSeen(bossNew.id)) {
+    if (bossNew && !bossNew.echo && !bossDuo && !Save.eSeen(bossNew.id)) {
       Save.markESeen(bossNew.id);
       const lines = T.debut[bossNew.id].map(([n, t]) => radioLine(t, n));
       if (T.signal[bossNew.id]) lines.push(bossLine(T.signal[bossNew.id], bossNew.id === 'truman' ? '???' : bossNew.name + ' · 신호'));   // 트루먼 speaks for itself, still unnamed
@@ -4445,7 +4507,16 @@ function makeShooter() {
     let delay = 0.3;
     for (const [k, nb] of [[bossKind, bossNew], [bossDuo, duoNew]]) {
       if (!k) continue;
-      if (nb) {
+      if (nb?.echo) {
+        Save.markESeen(nb.id);
+        if (P.id === nb.craft) radioToast(nb.name, T.echoSelf[nb.id], delay);
+        else radioToast('관제탑', echoLine(nb.id, T.echo[nb.id]), delay);
+        delay += 4.6;
+        if (nb.id === 'truman') {
+          radioToast('트루먼(편대)', echoLine('trumanWing', T.echoTruman), delay);
+          delay += 4.6;
+        }
+      } else if (nb) {
         const first = !Save.eSeen(nb.id), ls = T.again[nb.id];
         Save.markESeen(nb.id);
         const pick = ls[Math.floor(stageNo / 10) % ls.length], [n, t] = first ? T.debut[nb.id][0] : Array.isArray(pick) ? pick : ['관제탑', pick];
@@ -5148,7 +5219,7 @@ function makeShooter() {
     });
   }
   function bomb() {
-    if (App.mode !== 'play' || scene || ending || player.bombs <= 0 || player.dead) return;
+    if (App.mode !== 'play' || scene || ending || trumanChoice || player.bombs <= 0 || player.dead) return;
     initAudio();
     player.bombs--;
     if (camp.daily) camp.daily.bombs++;
@@ -5213,7 +5284,7 @@ function makeShooter() {
     for (const e of enemies.slice()) if (!e.dead && e.y > -40) hitEnemy(e, e.isBoss ? bossDmg : dmg);
   }
   function useUlt() {
-    if (App.mode !== 'play' || scene || ending || ult || !ultReady || player.dead) return;
+    if (App.mode !== 'play' || scene || ending || trumanChoice || ult || !ultReady || player.dead) return;
     initAudio();
     ultReady = false;
     buzz([40, 40, 70]);
@@ -6296,6 +6367,7 @@ function makeShooter() {
   function setPlane(def) {
     def = withLivery(def);
     P = PLANES.includes(def) ? def : Object.assign({}, def, { pilot: def.pilot || PLANES[camp.orig].pilot });
+    if (camp.endless && Save.settings.endlessPilot !== P.pilot.id) Save.set('endlessPilot', P.pilot.id);
     const hp = Math.max(2, P.hp + D.hpBonus);
     player.maxHp = hp; player.hp = hp; player.inv = Math.max(player.inv, 2); player.sub = null; player.burstN = 0;
   }
@@ -6509,8 +6581,93 @@ function makeShooter() {
     });
   }
 
+  function canStartTrumanChoice(e) {
+    return e.isBoss && e.type === 'truman' && bossNew?.id === 'truman' && !bossNew.echo && !bossDuo &&
+      camp.act === 4 && !camp.attack && !player.dead && !Save.eSeen('_tend');
+  }
+  function startTrumanChoice(e) {
+    const pilot = currentPilotIndex();
+    e.hp = Math.max(1, e.hp);
+    e.flash = 0; e.mimic = pilot; e.burst = 0;
+    trumanChoice = { e, pilot, t: 0, shotT: 0, x: e.x, y: e.y, side: player.x <= W / 2 ? 1 : -1 };
+    player.inv = Math.max(player.inv, 2);
+    drag = anchor = ult = null;
+    pb = []; beams = [];
+    showBanner(PLANES[pilot].weaponName, '트루먼 · 마지막 흉내', TRUMAN_STOP);
+  }
+  function updateTrumanChoice(dt) {
+    const c = trumanChoice, e = c.e, before = c.t;
+    c.t += dt;
+    if (c.t < TRUMAN_STOP) {
+      c.shotT -= dt;
+      if (c.shotT <= 0) {
+        fireTrumanAs(e, c.pilot, false);
+        c.shotT = [0.56, 0.43, 0.59, 0.39][c.pilot];
+        tone(220 + c.pilot * 60, 0.08, 'square', 0.02, 130);
+      }
+      if (e.burst > 0) {
+        e.burstT -= dt;
+        if (e.burstT <= 0) {
+          shootAt(e.x, e.y + 20, 300, 1, 0, 4, 0);
+          eb[eb.length - 1].tint = hexRgb(PLANES[0].look.accent);
+          e.burst--; e.burstT = 0.055;
+        }
+      }
+      for (const b of eb) moveEnemyBullet(b, dt);
+      eb = eb.filter(b => !b.hit && b.y < H + 40 && b.x > -60 && b.x < W + 60);
+      return;
+    }
+    if (before < TRUMAN_STOP) {
+      e.choicePose = time;
+      banner.t = 0;
+      for (const b of eb) spark(b.x, b.y, '232,231,255', 2, 44);
+      for (const other of enemies) if (other !== e && !other.dead) spark(other.x, other.y, '218,218,246', 8, 55);
+      enemies = [e]; eb = []; beams = []; timers = [];
+      e.burst = 0;
+      tone(510, 0.4, 'sine', 0.025, 290);
+    }
+    const path = clamp((c.t - TRUMAN_PATH) / (TRUMAN_FADE - TRUMAN_PATH), 0, 1);
+    const ease = path * path * (3 - 2 * path);
+    e.x = c.x + ((c.side > 0 ? W - 86 : 86) - c.x) * ease;
+    e.y = c.y + 20 * ease; e.rot = c.side * 0.16 * ease;
+    e.choiceFade = clamp((c.t - TRUMAN_FADE) / (TRUMAN_END - TRUMAN_FADE), 0, 1);
+    if (c.t >= TRUMAN_END) {
+      e.hp = 0;
+      trumanChoice = null;
+      killEnemy(e, true);
+    }
+  }
+  function advanceTrumanChoice() {
+    const t = trumanChoice.t;
+    if (t >= TRUMAN_LINE) updateTrumanChoice((t < TRUMAN_PATH ? TRUMAN_PATH : t < TRUMAN_FADE ? TRUMAN_FADE : TRUMAN_END) - t);
+  }
+  function drawTrumanChoice() {
+    const { e, t } = trumanChoice;
+    if (t < TRUMAN_STOP) for (const other of enemies) if (other !== e && !other.dead) drawEnemy(other);
+    const shade = clamp(t / 0.35, 0, 1) * (1 - clamp((t - TRUMAN_PATH) / 1.4, 0, 1));
+    ctx.fillStyle = `rgba(14,12,38,${shade * 0.62})`; ctx.fillRect(0, 0, W, H);
+    if (t >= TRUMAN_PATH) {
+      const x = clamp(player.x, 20, W - 20), strength = clamp((t - TRUMAN_PATH) / 0.7, 0, 1);
+      const beam = ctx.createLinearGradient(x - 40, 0, x + 40, 0);
+      beam.addColorStop(0, 'rgba(236,232,255,0)'); beam.addColorStop(0.5, `rgba(236,232,255,${0.25 * strength})`); beam.addColorStop(1, 'rgba(236,232,255,0)');
+      ctx.fillStyle = beam; ctx.fillRect(x - 40, 0, 80, player.y);
+      glowDot(x, player.y * (1 - (t - TRUMAN_PATH) % 1), 35, '239,235,255', 0.5 * strength);
+    }
+    ctx.save(); ctx.globalAlpha = 1 - (e.choiceFade || 0); drawEnemy(e); ctx.restore();
+    if (e.choiceFade > 0) glowDot(e.x, e.y, 74 - 48 * e.choiceFade, '255,255,255', Math.sin(Math.PI * e.choiceFade) * 0.9);
+    drawEnemyBullets(eb); drawParts();
+    drawPlane(player.x, player.y, 0, player.tilt, 1, player.prop, P.look);
+    if (t >= TRUMAN_LINE && t < TRUMAN_PATH) {
+      ctx.save();
+      ctx.globalAlpha = clamp((t - TRUMAN_LINE) / 0.55, 0, 1);
+      bigText('트루먼', W / 2, H * 0.44, 16, 'center');
+      bigText('…싫어. 이건, 내가 고를래.', W / 2, H * 0.49, 27, 'center');
+      ctx.restore();
+    }
+    if (t >= TRUMAN_LINE) label('화면 누르기 ▶', W - 22, H - 32, '#e7dff7', 'right');
+  }
   function hitEnemy(e, dmg, flank) {
-    if (e.dead) return;
+    if (e.dead || trumanChoice) return;
     if (e.armored && turretsLeft()) { e.flash = 0.03; return; }
     if (e.shield > 0 && !flank) {
       const a = Math.min(e.shield, dmg);
@@ -6529,9 +6686,10 @@ function makeShooter() {
     if (e.type === 'seed') dmg /= 1 + 0.15 * (e.tough || 0);
     if (e.type === 'halo' && !haloPass && !haloOpen(e, player.x, player.y)) dmg *= 0.3;   // lasers, bombs and the like: weak through the ring
     e.hp -= dmg; e.flash = 0.07;
+    if (canStartTrumanChoice(e) && e.hp <= e.maxHp * 0.15) { startTrumanChoice(e); return; }
     if (e.hp <= 0) killEnemy(e);
   }
-  function killEnemy(e) {
+  function killEnemy(e, quiet = false) {
     e.dead = true; kills++;
     if (camp.daily && (e.type === camp.daily.foe || e.type === camp.daily.foe2)) camp.daily.foeKills++;
     if (camp.daily && e.elite && camp.daily.eliteT > 0) {
@@ -6547,7 +6705,7 @@ function makeShooter() {
     if (e.isBoss) {
       if (e.type === 'turret') { hitStop = Math.max(hitStop, 0.05); buzz(30); }
       addScore(e.score * stageNo, e.x, e.y - 10);
-      explode(e.x, e.y, e.type === 'turret' ? 1.4 : 2.6);
+      if (!quiet) explode(e.x, e.y, e.type === 'turret' ? 1.4 : 2.6);
       if (e.type === 'turret' && !turretsLeft()) {
         e.parent.armored = false;
         dropItem(e.parent.x - 26, e.parent.y + 40, 'P'); dropItem(e.parent.x + 26, e.parent.y + 40, 'H');
@@ -6559,7 +6717,7 @@ function makeShooter() {
         const other = enemies.find(o => o.type === 'twin' && !o.dead);
         if (other) { dropItem(clamp(e.x - 26, 30, W - 30), e.y, 'P'); dropItem(clamp(e.x + 26, 30, W - 30), e.y, 'H'); other.enraged = true; showBanner('분노', '남은 전투기가 빨라져요', 1.6, true); }
       }
-      if (!bossParts().length) stageClear(e);
+      if (!bossParts().length) stageClear(e, quiet);
       return;
     }
     addScore(e.score, e.x, e.y - 10);
@@ -6578,22 +6736,27 @@ function makeShooter() {
       dropItem(e.x, e.y, kind);
     }
   }
-  function stageClear(e) {
+  function stageClear(e, quiet = false) {
     if (camp.daily) camp.daily.boss++;
-    hitStop = Math.max(hitStop, 0.16); buzz([60, 40, 140]);
+    if (!quiet) { hitStop = Math.max(hitStop, 0.16); buzz([60, 40, 140]); }
     if (e.type === 'factory') { startFinale(e); return; }
-    for (let i = 0; i < 12; i++) later(i * 0.12, () => explode(e.x + rand(-80, 80), e.y + rand(-40, 40), 1.7));
+    if (!quiet) {
+      for (let i = 0; i < 12; i++) later(i * 0.12, () => explode(e.x + rand(-80, 80), e.y + rand(-40, 40), 1.7));
     later(1.2, () => { explode(e.x, e.y, 3.4); flashColor = '255,255,255'; flashT = 0.5; parts.push({ kind: 'wave', x: e.x, y: e.y, life: 1, max: 1, size: 900, color: '255,230,200' }); });
     explode(e.x, e.y, 3);
     flashColor = '255,240,220'; flashT = 0.35;
     slowT = 1.3;
     for (const b of eb) spark(b.x, b.y, '255,210,150', 2);
+    }
     eb = []; beams = []; threads = []; cells = [];
     for (const o of enemies) if (!o.isBoss && !o.dead) { o.dead = true; explode(o.x, o.y, 0.7); }
     dropItem(e.x - 40, e.y, 'P'); dropItem(e.x, e.y + 20, 'H'); dropItem(e.x + 40, e.y, 'B');
     dropItem(e.x, e.y - 20, ['M', 'L', 'S'][Math.floor(Math.random() * 3)]);
     addScore(2000 * stageNo);
-    later(1.9, afterBoss);
+    if (quiet) {
+      enemies = enemies.filter(o => !o.dead);
+      afterBoss();
+    } else later(1.9, afterBoss);
   }
   function afterBoss() {
     if (player.dead) { pendingAfter = true; return; }
@@ -6617,7 +6780,7 @@ function makeShooter() {
     }
     if (camp.act === 4 && !camp.attack) {
       // the first time 트루먼 falls alone: the last radio, then the ending of 잔해 소탕 작전; then the unlock as usual
-      if (bossNew && bossNew.id === 'truman' && !bossDuo && !Save.eSeen('_tend')) {
+      if (bossNew?.id === 'truman' && !bossNew.echo && !bossDuo && !Save.eSeen('_tend')) {
         const T = ENDLESS_TALK.epilogue;
         startScene([bossLine(T.truman, '트루먼'), ...T.radio.map(([n, x]) => radioLine(x, n)), pilotLine(T.reply[P.pilot.id] || T.reply.narae), radioLine(T.close[1], T.close[0])], () => {
           Save.markESeen('_tend');
@@ -6629,7 +6792,16 @@ function makeShooter() {
       if (endlessWrap(false)) return;
     }
     function endlessWrap(quiet) {
-      if (!quiet) for (const nb of [bossNew, duoNew]) if (nb) radioToast(nb.name, ENDLESS_TALK.down[nb.id]);
+      if (!quiet) {
+        const stagger = bossNew?.echo || duoNew?.echo;
+        let delay = 0;
+        for (const nb of [bossNew, duoNew]) {
+          if (!nb) continue;
+          if (nb.echo) radioToast('관제탑', ENDLESS_TALK.echoDown[nb.id], delay);
+          else radioToast(nb.name, ENDLESS_TALK.down[nb.id], delay);
+          if (stagger) delay += 4.6;
+        }
+      }
       const fresh = [bossNew, duoNew].filter(nb => nb && !Save.eUnlocked(nb.craft));
       if (fresh.length) {
         normalFinish();
@@ -6678,7 +6850,7 @@ function makeShooter() {
   }
   function dropItem(x, y, kind) { items.push({ x, y, kind, t: 0, vy: 70 }); }
   function hurtPlayer() {
-    if (player.inv > 0 || player.dead || scene || shieldT > 0 || finale) return;
+    if (player.inv > 0 || player.dead || scene || shieldT > 0 || finale || trumanChoice) return;
     player.hp--;
     if (camp.daily) camp.daily.hits++;
     player.inv = 2;
@@ -6689,6 +6861,54 @@ function makeShooter() {
     tone(180, 0.3, 'sawtooth', 0.06, 60);
     for (let i = eb.length - 1; i >= 0; i--) if (Math.hypot(eb[i].x - player.x, eb[i].y - player.y) < 110) eb.splice(i, 1);
     if (player.hp <= 0) { player.dead = true; deathT = 1.6; player.sub = null; explode(player.x, player.y, 2.4); }
+  }
+
+  function moveEnemyBullet(b, dt, ruleWind = 0) {
+    if (ruleWind) {
+      const add = ruleWind * 1.1 * dt;
+      b.drift = b.drift || 0;
+      if (Math.abs(b.drift + add) <= 140) { b.drift += add; b.vx += add; }
+    }
+    if (b.home > 0 && !player.dead) {
+      b.home -= dt;
+      const speed = Math.hypot(b.vx, b.vy), current = Math.atan2(b.vy, b.vx);
+      const aim = Math.atan2(player.y - b.y, player.x - b.x) - current;
+      const delta = Math.atan2(Math.sin(aim), Math.cos(aim));
+      const angle = current + clamp(delta, -2.2 * dt, 2.2 * dt);
+      b.vx = Math.cos(angle) * speed; b.vy = Math.sin(angle) * speed;
+    }
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    if (b.fuse !== undefined) {
+      b.fuse -= dt;
+      if (b.fuse <= 0) {
+        b.hit = true;
+        ring(b.x, b.y, 8, 150, rand(0, 1), 5, 1);
+        spark(b.x, b.y, '255,190,120', 8, 160); boom(0.2, 0.08, 900);
+      }
+    }
+  }
+  function fireTrumanAs(e, k, light) {
+    const tint = hexRgb(PLANES[k].look.accent);
+    if (k === 0) {
+      e.burst = light ? 5 : 10; e.burstT = 0;
+    } else if (k === 1) {
+      const n = light ? 5 : 7, aim = Math.atan2(player.y - e.y, player.x - e.x), speed = 200 * bspd();
+      for (let i = 0; i < n; i++) {
+        const a = aim + (i - (n - 1) / 2) * 0.2;
+        eb.push({ x: e.x, y: e.y + 30, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: 5, tint });
+      }
+    } else if (k === 2) {
+      const speed = 140 * bspd();
+      for (const dx of light ? [0] : [-50, 0, 50]) {
+        const a = Math.atan2(player.y - e.y, player.x - e.x - dx);
+        eb.push({ x: e.x + dx, y: e.y + 30, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: 10, fuse: 1.4, tint });
+      }
+    } else {
+      const speed = 170 * bspd();
+      for (const side of light ? [1] : [-1, 1]) {
+        eb.push({ x: e.x + side * 40, y: e.y + 10, vx: side * speed * 0.6, vy: speed * 0.5, r: 6, home: 1.6, tint });
+      }
+    }
   }
 
   function updateBoss(e, dt) {
@@ -6893,28 +7113,23 @@ function makeShooter() {
       const per = e.phase2 ? 3.2 : 6;
       e.mimicT -= dt;
       if (e.mimicT <= 0 || e.mimic === undefined) {
-        e.mimic = e.mimic === undefined ? 0 : (e.mimic + 1) % 4; e.mimicT = per; e.shotT = 0.5;
+        const first = e.mimic === undefined;
+        e.mimic = first ? currentPilotIndex() : (e.mimic + 1) % PLANES.length;
+        e.mimicT = per; e.shotT = 0.5;
         const pl = PLANES[e.mimic];
-        radioToast('트루먼 · ' + pl.pilot.name + ' 흉내', TRUMAN_MIMIC[e.mimic]);
+        const lines = first && e.firstMimicLine ? TRUMAN_FIRST_MIMIC : TRUMAN_MIMIC;
+        radioToast('트루먼 · ' + pl.pilot.name + ' 흉내', lines[e.mimic]);
         floatText(e.x, e.y + 110, pl.pilot.name + '의 ' + pl.weaponName, hexRgb(pl.look.accent));
         tone(400 + e.mimic * 120, 0.25, 'triangle', 0.03, 900);
       }
-      const tint = hexRgb(PLANES[e.mimic].look.accent);
-      const fireAs = (k, light) => {
-        if (k === 0) { e.burst = light ? 5 : 10; e.burstT = 0; }                                                     // 연사 바늘: a fast stream
-        else if (k === 1) { const n = light ? 5 : 7; const a0 = Math.atan2(player.y - e.y, player.x - e.x); for (let i = 0; i < n; i++) { const a = a0 + (i - (n - 1) / 2) * 0.2, sp = 200 * bspd(); eb.push({ x: e.x, y: e.y + 30, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 5, tint: hexRgb(PLANES[1].look.accent) }); } }   // 확산탄
-        else if (k === 2) { for (const dx of light ? [0] : [-50, 0, 50]) { const a = Math.atan2(player.y - e.y, player.x - e.x - dx) , sp = 140 * bspd(); eb.push({ x: e.x + dx, y: e.y + 30, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 10, fuse: 1.4, tint: hexRgb(PLANES[2].look.accent) }); } }   // 관통 포탄: heavy shells that burst
-        else { for (const sd of light ? [1] : [-1, 1]) { const sp = 170 * bspd(); eb.push({ x: e.x + sd * 40, y: e.y + 10, vx: sd * sp * 0.6, vy: sp * 0.5, r: 6, home: 1.6, tint: hexRgb(PLANES[3].look.accent) }); } }   // 유도 미사일
-      };
       e.shotT -= fr;
       if (e.shotT <= 0) {
-        fireAs(e.mimic, false);
-        if (e.phase2) fireAs((e.mimic + 2) % 4, true);   // below half: two pilots at once
+        fireTrumanAs(e, e.mimic, false);
+        if (e.phase2) fireTrumanAs(e, (e.mimic + 2) % 4, true);   // below half: two pilots at once
         e.shotT = [1.6, 1.1, 1.5, 1.3][e.mimic] * (e.phase2 ? 0.85 : 1);
         tone(220 + e.mimic * 60, 0.08, 'square', 0.02, 130);
       }
       if (e.burst > 0) { e.burstT -= dt; if (e.burstT <= 0) { shootAt(e.x, e.y + 20, 300, 1, 0, 4, 0); eb[eb.length - 1].tint = hexRgb(PLANES[0].look.accent); e.burst--; e.burstT = 0.07; } }
-      void tint;
     } else if (e.type === 'seed') {
       // 민들레: drops seeds that sprout into small craft unless shot first; every grown craft makes the body tougher.
       // Below half a gust blows seeds across the whole screen.
@@ -6923,8 +7138,8 @@ function makeShooter() {
       const pods = () => enemies.filter(o => o.type === 'seedpod' && !o.dead).length;
       e.seedT -= fr;
       if (e.seedT <= 0) {
-        for (let k = 0; k < (e.phase2 ? 4 : 3); k++) if (pods() < 12) seedPod(e, e.x + rand(-40, 40), e.y + 10, rand(50, W - 50), rand(H * 0.24, H * 0.56));
-        e.seedT = e.phase2 ? 3 : 3.8; tone(900, 0.2, 'sine', 0.02, 1300);
+        for (let k = 0; k < (e.phase2 ? 5 : 4); k++) if (pods() < 12) seedPod(e, e.x + rand(-40, 40), e.y + 10, rand(50, W - 50), rand(H * 0.24, H * 0.56));
+        e.seedT = e.phase2 ? 2.5 : 3.8; tone(900, 0.2, 'sine', 0.02, 1300);
       }
       e.fireT -= fr;
       if (e.fireT <= 0) { ring(e.x, e.y - 8, e.phase2 ? 16 : 13, 125, mt, 5, 1); e.fireT = e.phase2 ? 1.5 : 1.8; }
@@ -6933,14 +7148,15 @@ function makeShooter() {
       // 홀씨 융단 폭격: a line of seeds swoops in across the screen and bursts the moment it lands
       e.carpetT = (e.carpetT === undefined ? 2 : e.carpetT) - fr;
       if (e.carpetT <= 0 && !player.dead) {
-        const n = e.phase2 ? 9 : 7, band = clamp(player.y + rand(-140, 40), H * 0.35, H - 60), dir = Math.random() < 0.5 ? 1 : -1;
+        const n = e.phase2 ? 5 : 3, band = clamp(player.y + rand(-140, 40), H * 0.35, H - 60), dir = Math.random() < 0.5 ? 1 : -1;
+        const spacing = (W - 60) / Math.max(n - 1, 1);
         for (let i = 0; i < n; i++) later(i * 0.07, () => {
-          const tx = dir > 0 ? 30 + i * (W - 60) / (n - 1) : W - 30 - i * (W - 60) / (n - 1), ty = band + rand(-30, 30), x0 = tx + rand(-40, 40), y0 = -12, fuse = 0.55;
+          const tx = dir > 0 ? 30 + i * spacing : W - 30 - i * spacing, ty = band + rand(-30, 30), x0 = tx + rand(-40, 40), y0 = -12, fuse = 0.55;
           eb.push({ x: x0, y: y0, vx: (tx - x0) / fuse, vy: (ty - y0) / fuse, r: 6, fuse, tint: '245,240,255' });
           if (i % 2 === 0) tone(1300 - i * 60, 0.05, 'triangle', 0.015, 600);
         });
         later(0.6, () => { boom(0.5, 0.16, 900); shake = Math.max(shake, 0.25); });
-        e.carpetT = e.phase2 ? 2.8 : 3.6;
+        e.carpetT = e.phase2 ? 3 : 3.6;
       }
       if (e.phase2) {
         e.windT -= fr;
@@ -7187,21 +7403,7 @@ function makeShooter() {
 
     ruleWind = 0;
     if (hasRule('wind')) { const g = Math.sin(time * 0.4); ruleWind = Math.abs(g) < 0.3 ? 0 : Math.sign(g) * (Math.abs(g) - 0.3) / 0.7 * 115; if (!windNow) windNow = ruleWind; }
-    for (const b of eb) {
-      if (freezeT > 0) continue;
-      if (ruleWind) { const add = ruleWind * 1.1 * dt; b.drift = b.drift || 0; if (Math.abs(b.drift + add) <= 140) { b.drift += add; b.vx += add; } }
-      if (b.home > 0 && !player.dead) {
-        b.home -= dt;
-        const sp = Math.hypot(b.vx, b.vy), cur = Math.atan2(b.vy, b.vx);
-        let da = Math.atan2(player.y - b.y, player.x - b.x) - cur; da = Math.atan2(Math.sin(da), Math.cos(da));
-        const na = cur + clamp(da, -2.2 * dt, 2.2 * dt); b.vx = Math.cos(na) * sp; b.vy = Math.sin(na) * sp;
-      }
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.fuse !== undefined) {
-        b.fuse -= dt;
-        if (b.fuse <= 0) { b.hit = true; ring(b.x, b.y, 8, 150, rand(0, 1), 5, 1); spark(b.x, b.y, '255,190,120', 8, 160); boom(0.2, 0.08, 900); }
-      }
-    }
+    if (freezeT <= 0) for (const b of eb) moveEnemyBullet(b, dt, ruleWind);
     if (shieldT > 0 && !p.dead) for (const b of eb) if (!b.hit && Math.hypot(b.x - p.x, b.y - p.y) < 64) {
       b.hit = true;
       const a = Math.atan2(b.y - p.y, b.x - p.x);
@@ -7444,7 +7646,7 @@ function makeShooter() {
       bossKind = BOSS_ORDER[0]; bossNew = null; duoNew = null; mimicT = 0; mimicI = 0; unlockCard = null; inks = []; threads = []; cells = []; muteT = 0; ult = null; ultReady = true; ending = null;
       camp = { act: 1, orig: PLANES.indexOf(P), pool: CRAFT_ORDER.slice(0, 3), next: 3, done: [], craft: null, chStage: -1, chapter: 0 };
       P = withLivery(P);   // the livery from 출격 일지 (story, endless and 3분 출격 alike)
-      finale = null; freezeT = 0; shieldT = 0; droneT = 0; boltT = 0; bossShadow = false;
+      finale = null; trumanChoice = null; freezeT = 0; shieldT = 0; droneT = 0; boltT = 0; bossShadow = false;
       gallery = false; secFx = []; sec2T = 0; bossDuo = null; attackT = 0; attackEnd = 0; grazes = 0; grazeSfx = 0; survBonus = 0; ruleWind = 0; stormT = 4; clouds = null;
       stageTime = 0; spawnT = 1.6; bossSpawned = false; clearT = 0; introShown = false;
       setSky(0);
@@ -7468,7 +7670,8 @@ function makeShooter() {
         camp.orig = g.kind === 'pilot' || g.kind === 'epilogue' ? g.plane : App.setup.plane;
         P = PLANES[camp.orig];
         player.x = W / 2; player.y = H + 200; player.inv = 999;
-        ending = { t: 0, kind: g.kind, id: g.kind === 'epilogue' ? g.pilot : g.id, finish: () => App.openGallery() };
+        if (g.kind === 'radio') startScene(g.lines.map(([name, line]) => radioLine(line, name)), () => App.openGallery());
+        else ending = { t: 0, kind: g.kind, id: g.kind === 'epilogue' ? g.pilot : g.id, finish: () => App.openGallery() };
         return;
       }
       if (opts && opts.attack) {
@@ -7506,8 +7709,9 @@ function makeShooter() {
         later(2.6, () => floatText(player.x, player.y - 50, '무기: ' + P.weaponName, '220,235,255'));
       });
     },
-    onDown() { if (ending) { skipEnding(); return; } if (scene) { advanceScene(); return; } if (unlockCard) { skipCard(); return; } anchor = { x: player.x, y: player.y }; },
+    onDown() { if (trumanChoice) { advanceTrumanChoice(); return; } if (ending) { skipEnding(); return; } if (scene) { advanceScene(); return; } if (unlockCard) { skipCard(); return; } anchor = { x: player.x, y: player.y }; },
     onKey(code) {
+      if (trumanChoice) { if (code === 'Space' || code === 'Enter') advanceTrumanChoice(); return true; }
       if (ending) { if (code === 'Space' || code === 'Enter') skipEnding(); return true; }
       if (unlockCard && (code === 'Space' || code === 'Enter')) { skipCard(); return true; }
       if (!scene) return false;
@@ -7516,7 +7720,7 @@ function makeShooter() {
     },
     bomb,
     ult: useUlt,
-    ultReady: () => ultReady && !ult && !scene && !ending && !player.dead,
+    ultReady: () => ultReady && !ult && !scene && !ending && !trumanChoice && !player.dead,
     inScene: () => !!scene && !ending,
     pos: () => (player && !player.dead ? player : null),
     skipScene,
@@ -7533,8 +7737,10 @@ function makeShooter() {
     update(dt) {
       updateSky(dt);
       player.prop += dt * 40;
+      if (trumanChoice) { updateTrumanChoice(dt); return; }
       if (ending) { ending.t += dt; return; }
       if (scene) {
+        if (gallery) return;
         scene.t += dt;
         const ln = scene.lines[scene.i];
         if (scene.t > ln.text.length / 45 + 3.4) { scene.t = 999; advanceScene(); }
@@ -7742,13 +7948,19 @@ function makeShooter() {
     },
     draw() {
       drawSkyBack();
+      if (trumanChoice) { drawSkyFront(); drawTrumanChoice(); return; }
+      if (gallery && scene) { drawSkyFront(); return; }
       const bossOn = bossParts().length > 0;
       if (bossOn) { ctx.fillStyle = 'rgba(30,0,20,0.22)'; ctx.fillRect(-20, -20, W + 40, H + 40); }
-      const shade = [];
-      for (const e of enemies) if (e.type !== 'turret') { if (e.shadow) shade.push(e); else drawEnemy(e); }
-      for (const e of enemies) if (e.type === 'turret' && e.shadow) shade.push(e);
+      const shade = [], echoes = [];
+      for (const e of enemies) {
+        if (e.nb?.echo || e.parent?.nb?.echo) echoes.push(e);
+        else if (e.type !== 'turret') { if (e.shadow) shade.push(e); else drawEnemy(e); }
+      }
+      for (const e of enemies) if (e.type === 'turret' && e.shadow && !e.nb?.echo && !e.parent?.nb?.echo) shade.push(e);
       if (shade.length) drawShadowed(shade);
-      for (const e of enemies) if (e.type === 'turret' && !e.shadow) drawEnemy(e);
+      if (echoes.length) drawShadowed(echoes, true);
+      for (const e of enemies) if (e.type === 'turret' && !e.shadow && !e.nb?.echo && !e.parent?.nb?.echo) drawEnemy(e);
       if (hasRule('storm')) drawClouds();
       if (hasRule('night') && !finale) drawNight();
       for (const it of items) drawItem(it);
@@ -7809,7 +8021,12 @@ function makeShooter() {
       }
     },
     hud() {
-      if (gallery) { if (ending) drawEnding(); return; }
+      if (trumanChoice) return;
+      if (gallery) {
+        if (ending) drawEnding();
+        if (scene) drawDialogue(scene.lines[scene.i], Infinity, scene.i < scene.lines.length - 1);
+        return;
+      }
       const ext = grazeOn(), ph = ext ? 78 : 58, top = 10 + ph + 6;
       panel(10, 10, 192, ph);
       label('점수', 20, 15);
@@ -7851,7 +8068,7 @@ function makeShooter() {
         ctx.fillStyle = 'rgba(30,6,16,0.8)'; rr(16, 60, w2 + 8, 40, 8); ctx.fill();
         ctx.strokeStyle = 'rgba(255,77,109,0.7)'; ctx.lineWidth = 1.5; rr(16, 60, w2 + 8, 40, 8); ctx.stroke();
         ctx.font = '14px "Black Han Sans", sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        ctx.fillStyle = '#ff8fa3'; ctx.fillText(bossLabel(), 24, 65);
+        ctx.fillStyle = '#ff8fa3'; ctx.fillText(bossLabel(), 24, 65, W - 92);
         label(Math.ceil(f * 100) + '%', W - 24, 67, '#ffd0d8', 'right');
         ctx.fillStyle = 'rgba(255,255,255,0.12)'; rr(24, 83, w2 - 8, 10, 5); ctx.fill();
         const g = ctx.createLinearGradient(24, 0, 24 + w2, 0);
@@ -7881,7 +8098,7 @@ function makeShooter() {
     },
     score: () => score,
     music: () => (ending ? 'menu' : finale ? 'boss' : bossSpawned && clearT <= 0 && bossParts().length ? 'boss' : 'stage'),
-    cinematic: () => !!ending || !!finale,
+    cinematic: () => !!ending || !!finale || !!trumanChoice,
     reason: () => (camp.attack ? (player.dead ? '격추됨' : '시간 종료') : '임무 종료'),
     continueInfo: () => ({ score, stage: stageNo, used: continues }),
     recordInfo: () => ({ plane: camp.orig, diff: DIFFS.indexOf(D), nc: continues === 0, endless: !!camp.endless, attack: !!camp.attack, daily: camp.daily ? camp.daily.date : null, planeId: camp.startPlane || P.id }),
@@ -8656,11 +8873,11 @@ const App = {
     else App.openEndlessHangar();
   },
   gal: null,
-  openGallery() {
+  openGallery(endless = App.gal?.endless || false) {
     initAudio();
-    const list = galleryList();
-    const keep = App.gal && App.gal.sel;
-    App.gal = { list, sel: keep !== null && keep !== undefined ? keep : Math.max(0, list.findIndex(g => g.seen)) };
+    const list = endless ? endlessGalleryList() : galleryList();
+    const keep = App.gal?.endless === endless ? App.gal.sel : null;
+    App.gal = { list, endless, sel: keep ?? Math.max(0, list.findIndex(g => g.seen)) };
     App.game = null; App.mode = 'gallery';
     flow = { x: 0, y: 1 }; streakAlpha = 0.12; setSky(0); parts = []; banner.t = 0;
     renderGallery(); syncUI();
@@ -8871,6 +9088,7 @@ function syncUI() {
   const openN = endlessChoices().filter(c => c.unlocked).length;
   [0, 1, 2].forEach(i => $('mode' + i).setAttribute('aria-pressed', String(i === App.menuSel)));
   $('endlessDesc').textContent = openN && ENDLESS_CRAFTS.every(c => Save.eUnlocked(c.id)) ? '잔해 소탕 완료. 보스 10종이 돌아가며 나와요.' : openN ? '잔해 소탕 작전. 복제 공장의 잔해와 끝없이 싸워요. 새 보스를 이기면 그 기체가 열려요.' : '잔해 소탕 작전. 엔딩을 본 기체로 끝없이 싸워요. 기체는 스토리 모드에서 열려요.';
+  $('endlessRadioHint').hidden = !Save.eSeen('_start') && !ENDLESS_BOSSES.some(b => Save.eSeen(b.id)) && !endlessEndingSeen();
   const eb = $('endlessBestBox');
   eb.textContent = openN ? '최고' : '기체';
   { const st = document.createElement('strong'); st.textContent = openN ? fmt(Save.endlessTop()) : openN + '/11'; eb.append(st); }
@@ -8988,6 +9206,8 @@ cv.addEventListener('pointercancel', endDrag);
 [0, 1, 2].forEach(i => $('mode' + i).addEventListener('click', () => App.chooseMode(i)));
 $('storyCtaBtn').addEventListener('click', () => App.openSetup('story'));
 $('galleryBtn').addEventListener('click', () => App.openGallery());
+$('galleryStory').addEventListener('click', () => App.openGallery(false));
+$('galleryEndless').addEventListener('click', () => App.openGallery(true));
 $('galleryPlay').addEventListener('click', () => App.playGallery());
 $('galleryBack').addEventListener('click', () => App.menu());
 for (const id of ['sensBtn', 'sensMenuBtn']) $(id).addEventListener('click', () => { sensI = (sensI + 1) % 3; SENS = SENS_LV[sensI][0]; Save.set('sens', sensI); syncUI(); });
@@ -9117,7 +9337,7 @@ function renderHangar() {
   });
   $('hangarKeys').textContent = mid ? '← → 기체 · Enter 출격 · Esc 그대로 계속' : E ? '← → 기체 · Enter 출격' + (fromMenu ? ' · Esc 뒤로' : '') : '1~3 기체 · Enter 출격';
 }
-/* ending gallery: twelve endings, each opens once it has been seen */
+/* ending gallery */
 function galleryList() {
   const E = GAMES.shooter.endings;
   return PLANES.map((p, i) => ({ kind: 'pilot', id: p.pilot.id, plane: i, title: E[p.pilot.id].title, sky: E[p.pilot.id].sky, look: p.look,
@@ -9129,6 +9349,32 @@ function galleryList() {
     .concat(PLANES.map((p, i) => { const X = GAMES.shooter.epilogues[p.pilot.id]; return { kind: 'epilogue', id: 'epi_' + p.pilot.id, pilot: p.pilot.id, plane: i, title: X.title, sky: X.sky, look: p.look,
       who: p.pilot.name + ' · ' + p.name, tag: '에필로그', line: X.text[0], hint: `스토리 모드를 ${withRo(p.pilot.name)} 끝까지 마치면, 최종 엔딩 뒤에 열려요.` }; }))
     .map(g => Object.assign(g, { seen: Save.seenEnding(g.id) }));
+}
+function endlessEndingSeen() {
+  return Save.eSeen('_tend') || (!DEV.unlockAll && !DEV.resetTruman && Save.eUnlocked('e_truman'));
+}
+function endlessGalleryList() {
+  const T = ENDLESS_TALK, craft = craftById('e_truman'), sky = craft.ending.sky;
+  const pilot = PLANES.find(p => p.pilot.id === Save.settings.endlessPilot)?.pilot || PLANES[0].pilot;
+  const finished = endlessEndingSeen();
+  const radio = (id, title, lines, seen, hint) => ({
+    kind: 'radio', id, title, lines, seen, hint, sky, tag: '무전 기록', who: lines[0][0], line: lines[0][1],
+  });
+  const epilogue = T.epilogue;
+  return [
+    radio('_start', '작전 개시', T.start, Save.eSeen('_start'), '무한 모드에서 작전 개시 무전을 들으면 열려요.'),
+    ...ENDLESS_BOSSES.map(({ id, name, debut }) => radio(id, name, [
+      ...T.debut[id],
+      [id === 'truman' ? '???' : name + ' · 신호', T.signal[id]],
+      [pilot.name, T.reply[id][pilot.id] || T.reply[id].narae],
+      T.again[id][2],
+    ], Save.eSeen(id), `STAGE ${debut}의 보스를 만나면 열려요.`)),
+    radio('_tend', '작전 종료', [
+      ['트루먼', epilogue.truman], ...epilogue.radio, [pilot.name, epilogue.reply[pilot.id]], epilogue.close,
+    ], finished, '무한 모드 STAGE 84의 보스를 격파하면 열려요.'),
+    { kind: 'craft', id: craft.id, title: craft.ending.title, sky, look: craft.look, who: craft.name,
+      tag: '잔해 소탕 작전', line: craft.ending.text[0], seen: finished, hint: '무한 모드 STAGE 84의 보스를 격파하면 열려요.' },
+  ];
 }
 function drawGalleryThumb(canvas, g) {
   const saved = ctx;
@@ -9146,7 +9392,8 @@ function drawGalleryThumb(canvas, g) {
     ctx.fillStyle = '#fff6da'; ctx.beginPath(); ctx.arc(122, 28, 11, 0, TAU); ctx.fill();
     ctx.fillStyle = 'rgba(255,248,238,0.85)';
     for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(i * 40 - 4, 96, 22, 0, TAU); ctx.fill(); }
-    const looks = g.look ? [g.look] : PLANES.map(p => p.look);
+    if (g.kind === 'radio') drawRadioIcon(67, 52, 24);
+    const looks = g.kind === 'radio' ? [] : g.look ? [g.look] : PLANES.map(p => p.look);
     looks.forEach((lk, i) => {
       const x = g.look ? 62 : 44 + i * 24, y = g.look ? 50 : 54 - Math.abs(i - 1.5) * 8;
       drawPlane(x, y, 0, 0, 1, 0.6, Object.assign({}, lk, { noShadow: true, scale: (lk.scale || 1) * (g.look ? 0.85 : 0.45) }));
@@ -9159,13 +9406,15 @@ function renderGallery() {
   if (!G) return;
   const list = $('galleryList'), info = $('galleryInfo');
   const seenN = G.list.filter(g => g.seen).length;
-  $('galleryCount').textContent = `엔딩 ${seenN} / ${G.list.length}` + (seenN === G.list.length ? ' · 모두 모았어요' : '');
+  $('galleryStory').setAttribute('aria-pressed', String(!G.endless));
+  $('galleryEndless').setAttribute('aria-pressed', String(G.endless));
+  $('galleryCount').textContent = `${G.endless ? '기록' : '엔딩'} ${seenN} / ${G.list.length}` + (seenN === G.list.length ? ' · 모두 모았어요' : '');
   list.textContent = '';
   G.list.forEach((g, i) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'gcard' + (g.seen ? '' : ' locked');
     b.setAttribute('aria-pressed', String(i === G.sel));
-    b.setAttribute('aria-label', g.seen ? g.title : '잠긴 엔딩');
+    b.setAttribute('aria-label', g.seen ? g.title : g.kind === 'radio' ? '잠긴 무전' : '잠긴 엔딩');
     const cv = document.createElement('canvas'); cv.width = 160; cv.height = 100;
     const nm = document.createElement('b'); nm.textContent = g.seen ? g.title : '???';
     const tg = document.createElement('span'); tg.textContent = g.tag;
@@ -9182,7 +9431,7 @@ function renderGallery() {
     add('pi-kit', g.tag + ' · ' + g.who);
     add('pi-story', '"' + g.line + '"');
   } else {
-    add('pi-name', '잠긴 엔딩 · ' + g.tag);
+    add('pi-name', (g.kind === 'radio' ? '잠긴 무전 · ' : '잠긴 엔딩 · ') + g.tag);
     add('pi-story', g.hint);
   }
   $('galleryPlay').disabled = !g.seen;
