@@ -4380,7 +4380,13 @@ function makeShooter() {
     bossSpawned = true;
     bossItemT = 6; escortT = 1; heavyT = 6;
     // Keep the encounter's identity even if this victory unlocks a craft.
-    const encounter = nb => nb ? { ...nb, echo: Save.eUnlocked(nb.craft) && !(nb.id === 'truman' && DEV.resetTruman) } : null;
+    const encounter = nb => {
+      if (!nb) return null;
+      // Stage 84's story can still be unseen on a save with the craft already unlocked.
+      const trumanStory = nb.id === 'truman' &&
+        (DEV.resetTruman || (!DEV.unlockAll && stageNo === nb.debut && !Save.eSeen('_tend')));
+      return { ...nb, echo: Save.eUnlocked(nb.craft) && !trumanStory };
+    };
     const sb = stageBoss(); bossKind = sb.kind; bossShadow = sb.shadow; bossDuo = null; bossNew = encounter(sb.nb); duoNew = null;
     const m = (1 + 0.08 * grow()) * D.ehp * (camp.attack ? 0.6 : 1) * (hasRule('armor') ? 1.15 : 1)
       * (camp.act === 4 && !camp.attack ? 1.15 : 1);   // endless: second weapons hit harder, so bosses hold a little longer
@@ -6804,8 +6810,10 @@ function makeShooter() {
       if (bossNew?.id === 'truman' && !bossNew.echo && !bossDuo && !Save.eSeen('_tend')) {
         const T = ENDLESS_TALK.epilogue;
         startScene([bossLine(T.truman, '트루먼'), ...T.radio.map(([n, x]) => radioLine(x, n)), pilotLine(T.reply[P.pilot.id] || T.reply.narae), radioLine(T.close[1], T.close[0])], () => {
-          Save.markESeen('_tend');
-          ending = { t: 0, kind: 'craft', id: 'e_truman', finish: () => { if (!endlessWrap(true)) normalFinish(); } };
+          ending = { t: 0, kind: 'craft', id: 'e_truman', finish: () => {
+            Save.markESeen('_tend');
+            if (!endlessWrap(true)) normalFinish();
+          } };
           fanfare();
         });
         return;
