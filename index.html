@@ -1853,6 +1853,7 @@ function spikeTri(x, y, ang, len, w) {
   ctx.closePath(); ctx.fill();
 }
 let craftTint = false;
+const COLORED_ENDLESS_HULLS = new Set(['octo', 'spider', 'seed', 'halo']);
 function lightHex(c) {
   if (typeof c !== 'string' || !/^#[0-9a-f]{6}$/i.test(c)) return c;
   const v = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)), w = [244, 246, 255];
@@ -1888,7 +1889,7 @@ function drawCraft(L) {
     face: -Math.PI / 2, mode: 'roam', armored: false, launchFx: 0, rot: Math.PI, craft: true }, o);
   ctx.save();
   ctx.scale(L.art, L.art);
-  craftTint = true;
+  craftTint = !COLORED_ENDLESS_HULLS.has(L.type);
   if (L.type === 'truman' && !L.preview) drawEnemy(fake({ type: 'truman_back', rot: 0 }));   // flying: prone, seen from behind
   else if (L.type === 'twin') { drawEnemy(fake({ x: -48, k: 1 })); drawEnemy(fake({ x: 48, k: 0 })); }
   else if (L.type === 'ace' || L.type.startsWith('truman') || L.type === 'halo' || L.type === 'seed') drawEnemy(fake({ rot: 0 }));
@@ -2793,7 +2794,7 @@ function drawEnemy(e) {
   if (e.elite) glowDot(e.x, e.y, (e.r || 16) * 2.4, '255,210,90', 0.5 + 0.2 * Math.sin(time * 8));
   ctx.translate(e.x, e.y);
   if (e.rot) ctx.rotate(e.rot);
-  const soften = e.craft && e.type !== 'truman' && e.type !== 'truman_back';
+  const soften = e.craft && !COLORED_ENDLESS_HULLS.has(e.type) && e.type !== 'truman' && e.type !== 'truman_back';
   const col = base => e.flash > 0 ? '#ffffff' : soften ? lightHex(base) : base;
   const blink = 0.6 + 0.4 * Math.sin(time * 8 + e.x);
   const hurt = e.maxHp ? 1 - e.hp / e.maxHp : 0;
@@ -3022,43 +3023,43 @@ function drawEnemy(e) {
       const pts = octoLegPts(i, legs[i]), segs = pts.length - 1, lf = e.legE && e.legE[i] && !e.legE[i].dead && e.legE[i].flash > 0;
       for (let k = 0; k < segs; k++) {
         const [x, y] = pts[k], [nx, ny, a] = pts[k + 1], w = 15 * (1 - k / (segs + 1)) + 2;
-        ctx.strokeStyle = lf ? '#ffffff' : col(k % 2 ? '#4b3b74' : '#3f3165'); ctx.lineWidth = w;
+        ctx.strokeStyle = lf ? '#ffffff' : col(k % 2 ? '#20b893' : '#127960'); ctx.lineWidth = w;
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
         if (legs[i] && k % 2 === 0 && k > 0) {
-          ctx.fillStyle = col('#b8a9e0');
+          ctx.fillStyle = col('#8ff9c6');
           ctx.beginPath(); ctx.arc((x + nx) / 2 + Math.cos(a + Math.PI / 2) * w * 0.22, (y + ny) / 2 + Math.sin(a + Math.PI / 2) * w * 0.22, Math.max(1.3, w * 0.17), 0, TAU); ctx.fill();
         }
       }
       const [x, y, a] = pts[segs];
-      if (legs[i]) { ctx.fillStyle = col('#c9c2d8'); spikeTri(x, y, a, 10, 3.2); }
+      if (legs[i]) { ctx.fillStyle = col('#beffe7'); spikeTri(x, y, a, 10, 3.2); }
       else glowDot(x, y, 9, '255,170,90', 0.45 + 0.4 * blink);   // a sparking stump, growing back
     }
     ctx.lineCap = 'butt';
     const g = ctx.createRadialGradient(-16, -34, 6, 0, -10, 74);
-    g.addColorStop(0, col('#6c5aa4')); g.addColorStop(0.6, col('#3b2f63')); g.addColorStop(1, col('#1d1636'));
+    g.addColorStop(0, col('#65efbc')); g.addColorStop(0.6, col('#159f80')); g.addColorStop(1, col('#064f44'));
     ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, -12, 66, 54, 0, 0, TAU); ctx.fill();
     // the wreckage it wears: riveted plates and a weld seam
     const plate = (px, py, w, h, r) => {
       ctx.save(); ctx.translate(px, py); ctx.rotate(r);
-      ctx.fillStyle = col('#8f88a6'); ctx.fillRect(-w / 2, -h / 2, w, h);
-      ctx.fillStyle = col('#5d5772'); ctx.fillRect(-w / 2, h / 2 - 3, w, 3);
-      ctx.fillStyle = col('#e2dcef'); for (const bx of [-w / 2 + 3, w / 2 - 3]) { ctx.beginPath(); ctx.arc(bx, -h / 2 + 3, 1.6, 0, TAU); ctx.fill(); }
+      ctx.fillStyle = col('#46eac1'); ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.fillStyle = col('#097866'); ctx.fillRect(-w / 2, h / 2 - 3, w, 3);
+      ctx.fillStyle = col('#d1ffec'); for (const bx of [-w / 2 + 3, w / 2 - 3]) { ctx.beginPath(); ctx.arc(bx, -h / 2 + 3, 1.6, 0, TAU); ctx.fill(); }
       ctx.restore();
     };
     plate(-30, -44, 30, 16, -0.4); plate(24, -50, 26, 14, 0.3); plate(42, -14, 20, 22, 0.15); plate(-44, -6, 18, 20, -0.2);
     ctx.strokeStyle = 'rgba(255,190,120,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(-8, -64); ctx.lineTo(-2, -42); ctx.lineTo(-10, -22); ctx.lineTo(-4, -4); ctx.stroke();
-    ctx.fillStyle = col('#2a2148'); ctx.beginPath(); ctx.ellipse(0, 26, 54, 14, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = col('#063b38'); ctx.beginPath(); ctx.ellipse(0, 26, 54, 14, 0, 0, TAU); ctx.fill();
     for (const sd of [-1, 1]) {
-      glowDot(sd * 24, 10, 15, '190,120,255', 0.55 + 0.45 * blink);
-      ctx.fillStyle = '#efe6ff'; ctx.beginPath(); ctx.ellipse(sd * 24, 10, 7.5, 5.5, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#5a2ea6'; ctx.beginPath(); ctx.ellipse(sd * 24, 11, 3, 4.5, 0, 0, TAU); ctx.fill();
+      glowDot(sd * 24, 10, 15, '81,255,171', 0.55 + 0.45 * blink);
+      ctx.fillStyle = '#d2fff1'; ctx.beginPath(); ctx.ellipse(sd * 24, 10, 7.5, 5.5, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#076b57'; ctx.beginPath(); ctx.ellipse(sd * 24, 11, 3, 4.5, 0, 0, TAU); ctx.fill();
     }
     if (hurt > 0.5) glowDot(0, 28, 34, '40,20,70', 0.7);   // ink gathering
     for (let k = 0; k < 5; k++) {   // wreckage drawn in around it
       const a = time * 0.8 + k * 1.26;
       ctx.save(); ctx.translate(Math.cos(a) * 94, -14 + Math.sin(a) * 42); ctx.rotate(time * 2 + k);
-      ctx.fillStyle = col('#9a93ab'); ctx.fillRect(-5, -3, 10, 6); ctx.restore();
+      ctx.fillStyle = col('#60d9a9'); ctx.fillRect(-5, -3, 10, 6); ctx.restore();
     }
 
   } else if (e.type === 'seedpod') {
@@ -3085,54 +3086,54 @@ function drawEnemy(e) {
     for (const sd of [-1, 1]) for (let i = 0; i < 4; i++) {
       const lift = Math.sin(time * 3 + i * 1.3 + (sd > 0 ? 1.6 : 0)) * 6;
       const hx = sd * 26, hy = -16 + i * 12, kx = sd * (72 + i * 5), ky = -58 + i * 26 + lift, fx = sd * (102 + (i % 2) * 14), fy = -44 + i * 38 + lift * 0.5;
-      ctx.strokeStyle = col('#c9c2d8'); ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
-      ctx.strokeStyle = col('#3a4054'); ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
-      ctx.fillStyle = col('#2a2f40'); ctx.beginPath(); ctx.arc(kx, ky, 5.5, 0, TAU); ctx.fill();
-      glowDot(kx, ky, 6, '190,120,255', 0.35 + 0.35 * blink);
-      ctx.fillStyle = col('#d8d2e6'); spikeTri(fx, fy, Math.atan2(fy - ky, fx - kx), 9, 2.6);
+      ctx.strokeStyle = col('#ff9b37'); ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
+      ctx.strokeStyle = col('#da5425'); ctx.lineWidth = 4.5; ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+      ctx.fillStyle = col('#792920'); ctx.beginPath(); ctx.arc(kx, ky, 5.5, 0, TAU); ctx.fill();
+      glowDot(kx, ky, 6, '255,114,54', 0.35 + 0.35 * blink);
+      ctx.fillStyle = col('#ffd797'); spikeTri(fx, fy, Math.atan2(fy - ky, fx - kx), 9, 2.6);
     }
     ctx.lineCap = 'butt';
-    ctx.fillStyle = col('#262a3a'); ctx.beginPath(); ctx.ellipse(0, -46, 42, 34, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = col('#7b302d'); ctx.beginPath(); ctx.ellipse(0, -46, 42, 34, 0, 0, TAU); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.ellipse(0, -46, 42, 34, 0, 0, TAU); ctx.clip();
-    ctx.strokeStyle = col('#8f88a6'); ctx.lineWidth = 3;
+    ctx.strokeStyle = col('#fb792f'); ctx.lineWidth = 3;
     for (let k = -3; k <= 3; k++) {
       ctx.beginPath(); ctx.moveTo(k * 14 - 30, -84); ctx.lineTo(k * 14 + 30, -8); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(k * 14 + 30, -84); ctx.lineTo(k * 14 - 30, -8); ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = col('#c9c2d8'); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, -46, 42, 34, 0, 0, TAU); ctx.stroke();
-    ctx.strokeStyle = `rgba(210,235,255,${0.55 + 0.3 * blink})`; ctx.lineWidth = 1.4;
+    ctx.strokeStyle = col('#ff9b37'); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, -46, 42, 34, 0, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,207,133,${0.55 + 0.3 * blink})`; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.moveTo(-42, -46); ctx.quadraticCurveTo(0, -22, 42, -46); ctx.moveTo(-30, -70); ctx.quadraticCurveTo(0, -52, 30, -70); ctx.moveTo(0, -80); ctx.lineTo(0, -12); ctx.stroke();
     const g = ctx.createLinearGradient(0, -22, 0, 36);
-    g.addColorStop(0, col('#3a4054')); g.addColorStop(1, col('#1b1e2a'));
+    g.addColorStop(0, col('#da5425')); g.addColorStop(1, col('#aa312d'));
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(30, -12); ctx.lineTo(34, 14); ctx.lineTo(16, 34); ctx.lineTo(-16, 34); ctx.lineTo(-34, 14); ctx.lineTo(-30, -12); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = col('#8f88a6'); ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = col('#fb792f'); ctx.lineWidth = 2; ctx.stroke();
     for (const [ex, ey, r] of [[-9, 8, 5], [9, 8, 5], [-19, 0, 3], [19, 0, 3], [-5, 21, 3], [5, 21, 3]]) {
-      glowDot(ex, ey, r * 2.4, '190,120,255', 0.5 + 0.5 * blink);
-      ctx.fillStyle = '#efe6ff'; ctx.beginPath(); ctx.arc(ex, ey, r * 0.6, 0, TAU); ctx.fill();
+      glowDot(ex, ey, r * 2.4, '255,114,54', 0.5 + 0.5 * blink);
+      ctx.fillStyle = '#ffefc8'; ctx.beginPath(); ctx.arc(ex, ey, r * 0.6, 0, TAU); ctx.fill();
     }
-    ctx.fillStyle = col('#c9c2d8'); ctx.beginPath(); ctx.moveTo(-8, 34); ctx.lineTo(8, 34); ctx.lineTo(0, 46); ctx.closePath(); ctx.fill();
-    if (!e.craft) { ctx.strokeStyle = 'rgba(210,235,255,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 46); ctx.quadraticCurveTo(Math.sin(time * 2) * 14, 80, Math.sin(time * 2.6) * 6, 112); ctx.stroke(); }
+    ctx.fillStyle = col('#ff9b37'); ctx.beginPath(); ctx.moveTo(-8, 34); ctx.lineTo(8, 34); ctx.lineTo(0, 46); ctx.closePath(); ctx.fill();
+    if (!e.craft) { ctx.strokeStyle = 'rgba(255,207,133,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, 46); ctx.quadraticCurveTo(Math.sin(time * 2) * 14, 80, Math.sin(time * 2.6) * 6, 112); ctx.stroke(); }
 
   } else if (e.type === 'seed') {
-    // 민들레: a pale seed-clock of filaments around an iron pod; scrap-cable roots; seeds break off and drift
+    // 민들레: golden filaments around the seed head, with green roots underneath.
     if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.25)'; ctx.beginPath(); ctx.ellipse(20, 86, 96, 26, 0, 0, TAU); ctx.fill(); }
-    ctx.strokeStyle = col('#3a4054'); ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.strokeStyle = col('#68b640'); ctx.lineWidth = 5; ctx.lineCap = 'round';
     for (const sd of [-1, 0, 1]) {
       ctx.beginPath(); ctx.moveTo(sd * 10, 18); ctx.quadraticCurveTo(sd * 28 + Math.sin(time * 2 + sd) * 6, 48, sd * 20, 76); ctx.stroke();
-      glowDot(sd * 20, 76, 7, '190,120,255', 0.4 + 0.4 * blink);
+      glowDot(sd * 20, 76, 7, '170,236,71', 0.4 + 0.4 * blink);
     }
     ctx.lineCap = 'butt';
     const N = 34, R = 76;
-    glowDot(0, -8, R + 18, '235,230,255', 0.2);
+    glowDot(0, -8, R + 18, '255,218,57', 0.2);
     if (e.tough) { glowDot(0, -8, R + 30, '190,120,255', Math.min(0.55, 0.09 * e.tough)); ctx.strokeStyle = `rgba(200,150,255,${Math.min(0.8, 0.14 * e.tough)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -8, R + 8, 0, TAU); ctx.stroke(); }
     for (let k = 0; k < N; k++) {
       const a = k / N * TAU + Math.sin(time * 0.6 + k) * 0.03, r = R * (0.9 + 0.1 * Math.abs(Math.sin(k * 7.3)));
       const x = Math.cos(a) * r, y = -8 + Math.sin(a) * r;
-      ctx.strokeStyle = 'rgba(240,236,255,0.55)'; ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(255,223,70,0.88)'; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(Math.cos(a) * 26, -8 + Math.sin(a) * 26); ctx.lineTo(x, y); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,245,145,0.94)'; ctx.lineWidth = 1;
       for (const d of [-0.5, -0.25, 0, 0.25, 0.5]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a + d) * 9, y + Math.sin(a + d) * 9); ctx.stroke(); }
     }
     if (!e.craft) for (let k = 0; k < 5; k++) {
@@ -3144,15 +3145,15 @@ function drawEnemy(e) {
       ctx.globalAlpha = 1;
     }
     const g = ctx.createRadialGradient(-8, -18, 4, 0, -8, 30);
-    g.addColorStop(0, col('#9a93ab')); g.addColorStop(1, col('#2b2f40'));
+    g.addColorStop(0, col('#ffeb57')); g.addColorStop(1, col('#bf6b05'));
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, -8, 28, 0, TAU); ctx.fill();
-    ctx.strokeStyle = col('#c9c2d8'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -8, 28, 0, TAU); ctx.stroke();
-    ctx.fillStyle = col('#e2dcef'); for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; ctx.beginPath(); ctx.arc(Math.cos(a) * 22, -8 + Math.sin(a) * 22, 1.8, 0, TAU); ctx.fill(); }
-    glowDot(0, -8, 20, '190,120,255', 0.6 + 0.4 * blink);
-    ctx.fillStyle = '#f3ecff'; ctx.beginPath(); ctx.arc(0, -8, 6.5, 0, TAU); ctx.fill();
+    ctx.strokeStyle = col('#ffca20'); ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -8, 28, 0, TAU); ctx.stroke();
+    ctx.fillStyle = col('#fff4a3'); for (let k = 0; k < 8; k++) { const a = k / 8 * TAU; ctx.beginPath(); ctx.arc(Math.cos(a) * 22, -8 + Math.sin(a) * 22, 1.8, 0, TAU); ctx.fill(); }
+    glowDot(0, -8, 20, '255,177,26', 0.6 + 0.4 * blink);
+    ctx.fillStyle = '#fff7b2'; ctx.beginPath(); ctx.arc(0, -8, 6.5, 0, TAU); ctx.fill();
 
   } else if (e.type === 'halo') {
-    // 달무리: a pale moon with a bright ring of light around it; turret pods ride the ring and gaps open in it.
+    // 달무리: a blue moon with a bright ring; turret pods ride the ring and gaps open in it.
     // Bullets only reach the moon through a gap; below half a second ring turns the other way.
     // (a moon and its halo, nothing else: no trench, no dish)
     if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.22)'; ctx.beginPath(); ctx.ellipse(18, 92, 112, 26, 0, 0, TAU); ctx.fill(); }
@@ -3161,26 +3162,26 @@ function drawEnemy(e) {
       ctx.save(); ctx.beginPath(); if (back) ctx.rect(-240, -240, 480, 246); else ctx.rect(-240, 6, 480, 240); ctx.clip();
       for (const [R, ry, a0r, gap] of rings) for (let i = 0; i < 3; i++) {
         const a0 = a0r + i * TAU / 3, a1 = a0 + TAU / 3 - gap;
-        ctx.strokeStyle = 'rgba(205,225,255,0.22)'; ctx.lineWidth = 20; ctx.beginPath(); ctx.ellipse(0, 6, R, ry, 0, a0, a1); ctx.stroke();
-        ctx.strokeStyle = col('#eef4ff'); ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(0, 6, R, ry, 0, a0, a1); ctx.stroke();
-        for (const q of [a0, a1]) glowDot(Math.cos(q) * R, 6 + Math.sin(q) * ry, 7, '235,244,255', 0.75);   // bright caps mark the gaps
+        ctx.strokeStyle = 'rgba(77,149,255,0.22)'; ctx.lineWidth = 20; ctx.beginPath(); ctx.ellipse(0, 6, R, ry, 0, a0, a1); ctx.stroke();
+        ctx.strokeStyle = col('#78c9ff'); ctx.lineWidth = 6; ctx.beginPath(); ctx.ellipse(0, 6, R, ry, 0, a0, a1); ctx.stroke();
+        for (const q of [a0, a1]) glowDot(Math.cos(q) * R, 6 + Math.sin(q) * ry, 7, '158,225,255', 0.75);   // bright caps mark the gaps
         const am = (a0 + a1) / 2, tx = Math.cos(am) * R, ty = 6 + Math.sin(am) * ry;
-        ctx.fillStyle = col('#3a4054'); rr(tx - 10, ty - 8, 20, 16, 5); ctx.fill();
-        ctx.fillStyle = col('#8f88a6'); ctx.fillRect(tx - 10, ty - 2, 20, 3);
-        glowDot(tx, ty, 8, '190,120,255', 0.5 + 0.5 * blink);
+        ctx.fillStyle = col('#233b9a'); rr(tx - 10, ty - 8, 20, 16, 5); ctx.fill();
+        ctx.fillStyle = col('#79acff'); ctx.fillRect(tx - 10, ty - 2, 20, 3);
+        glowDot(tx, ty, 8, '119,175,255', 0.5 + 0.5 * blink);
       }
       ctx.restore();
     };
     ringHalf(true);
-    glowDot(0, 0, 100, '205,222,255', 0.24);
+    glowDot(0, 0, 100, '87,151,255', 0.24);
     const g = ctx.createRadialGradient(-22, -24, 8, 0, 0, 62);
-    g.addColorStop(0, col('#f6f8ff')); g.addColorStop(0.55, col('#c9d3e8')); g.addColorStop(1, col('#7b86a6'));
+    g.addColorStop(0, col('#a9e6ff')); g.addColorStop(0.55, col('#4c91ff')); g.addColorStop(1, col('#293eaa'));
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 60, 0, TAU); ctx.fill();
-    ctx.fillStyle = 'rgba(108,118,150,0.35)';
+    ctx.fillStyle = 'rgba(28,59,159,0.35)';
     for (const [cx, cy, r] of [[-22, -18, 10], [18, -30, 6], [27, 8, 12], [-32, 20, 7], [6, 28, 5], [-6, -40, 4]]) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill(); }
-    ctx.fillStyle = col('#3a4054'); rr(-15, 36, 30, 13, 5); ctx.fill();
-    ctx.fillStyle = col('#e2dcef'); for (const bx of [-11, 11]) { ctx.beginPath(); ctx.arc(bx, 42, 1.6, 0, TAU); ctx.fill(); }
-    glowDot(0, 42, e.open ? 22 : 12, '190,120,255', e.open ? 0.95 : 0.55 + 0.45 * blink);
+    ctx.fillStyle = col('#233b9a'); rr(-15, 36, 30, 13, 5); ctx.fill();
+    ctx.fillStyle = col('#d4eaff'); for (const bx of [-11, 11]) { ctx.beginPath(); ctx.arc(bx, 42, 1.6, 0, TAU); ctx.fill(); }
+    glowDot(0, 42, e.open ? 22 : 12, '119,175,255', e.open ? 0.95 : 0.55 + 0.45 * blink);
     ringHalf(false);
     if (e.open && !e.craft && !e.icon) {   // the way in is open: a gold target ring
       ctx.strokeStyle = `rgba(255,224,140,${0.55 + 0.35 * blink})`; ctx.lineWidth = 2.5; ctx.setLineDash([7, 6]);
@@ -3906,19 +3907,19 @@ const ENDLESS_CRAFTS = [
   { id: 'e_octo', type: 'octo', name: '구름문어', ga: '가', title: '잔해 수집기', speed: 290, hp: 7, dmg: 1.1, hit: 5,
     weapon: 'whip', weaponName: '촉수 채찍', bomb: 'ink', bombName: '먹물 장막', ult: 'eight', ultName: '여덟 갈래',
     story: '폭발 잔해를 다리로 끌어모아 몸을 고친 첫 생존자. 가까운 적을 휘감는 짧고 강한 채찍을 휘둘러요.', unlockLine: '부서진 것을 모아 다시 날아오른다. 이번에는 우리 편에서.',
-    look: { kind: 'craft', type: 'octo', art: 0.32, accent: '#b9a4ff', scale: 1 }, stats: [3, 5, 4], ending: null },
+    look: { kind: 'craft', type: 'octo', art: 0.32, accent: '#50f0bc', scale: 1 }, stats: [3, 5, 4], ending: null },
   { id: 'e_spider', type: 'spider', name: '스파이더', ga: '를', title: '둥지 건설기', speed: 320, hp: 6, dmg: 1.1, hit: 4,
     weapon: 'net', weaponName: '실 그물', bomb: 'web', bombName: '거미줄 덫', ult: 'weave', ultName: '천 짜기',
     story: '잔해를 실로 엮어 새 둥지를 짓던 건설기. 날아가며 펼쳐지는 그물이 닿은 적을 계속 깎아요.', unlockLine: '둥지를 짓던 실이 이제 편대를 잇는다.',
-    look: { kind: 'craft', type: 'spider', art: 0.3, accent: '#d6c6ff', scale: 1 }, stats: [4, 4, 4], ending: null },
+    look: { kind: 'craft', type: 'spider', art: 0.3, accent: '#ff9350', scale: 1 }, stats: [4, 4, 4], ending: null },
   { id: 'e_seed', type: 'seed', name: '민들레', ga: '를', title: '포자 모체', speed: 330, hp: 5, dmg: 1.25, hit: 4,
     weapon: 'seed', weaponName: '씨앗탄', bomb: 'petal', bombName: '꽃씨 바람', ult: 'bloom', ultName: '만개',
     story: '씨앗을 퍼뜨려 복제기를 키우던 번식기. 씨앗탄이 적에 닿으면 작은 탄으로 퍼져요.', unlockLine: '바람에 실려 간 씨앗은 언젠가 꽃으로 핀다.',
-    look: { kind: 'craft', type: 'seed', art: 0.34, accent: '#f4f0ff', scale: 1 }, stats: [4, 3, 5], ending: null },
+    look: { kind: 'craft', type: 'seed', art: 0.34, accent: '#ffdd47', scale: 1 }, stats: [4, 3, 5], ending: null },
   { id: 'e_halo', type: 'halo', name: '달무리', ga: '를', title: '위성 요새', speed: 280, hp: 7, dmg: 1.25, hit: 5,
     weapon: 'orbit', weaponName: '궤도 위성', bomb: 'tide', bombName: '만조', ult: 'lunar', ultName: '궤도 포격',
     story: '복제체들이 띄운 새 하늘, 인공 위성 요새. 기체 둘레를 도는 작은 위성들이 함께 쏴요.', unlockLine: '그들의 하늘이었던 달이 이제 우리의 밤길을 비춘다.',
-    look: { kind: 'craft', type: 'halo', art: 0.3, accent: '#cfe0ff', scale: 1 }, stats: [3, 5, 5], ending: null },
+    look: { kind: 'craft', type: 'halo', art: 0.3, accent: '#76b8ff', scale: 1 }, stats: [3, 5, 5], ending: null },
   { id: 'e_truman', type: 'truman', name: '트루먼', ga: '을', title: '인간형 복제체', speed: 320, hp: 6, dmg: 1.2, hit: 4,
     weapon: 'mimic', weaponName: '흉내 사격', bomb: 'mimic', bombName: '기억 복제', ult: 'human', ultName: '사람의 비행',
     story: '사람이 되고 싶어 조종사를 흉내 내던 마지막 복제체. 6초마다 조종사 4명의 무기를 차례로 바꿔 써요.', unlockLine: '"트루먼, 편대 합류."',
@@ -4714,7 +4715,7 @@ function makeShooter() {
     c_cloud: { cd: 1.1, strike: 9, vortex: 1.4, vdps: 20, vr: 30 },                            // 낙뢰 구름: a cloud over the enemies, then a lightning column
     c_fortress: { cd: 0.5, beam: 3.4, guard: 20, rgb: '255,210,120' },  // 방패 위성: lasers, and the satellites block bullets
     c_ace: { cd: 0.45, zap: 4.6, chain: 2, rgb: '255,236,150' },  // 번개 위성: two satellites strike the nearest foes, and the bolt jumps on
-    e_truman: { laserCd: 0.5, beam: 4.5, zapCd: 0.55, zap: 5, rgbL: '170,225,255', rgbZ: '255,236,150' },   // 종이 위성: a laser plane and a lightning plane circling the craft
+    e_truman: { laserCd: 0.5, beam: 4.5, zapCd: 0.55, zap: 5, rgbL: '170,225,255', rgbZ: '255,236,150' },   // 매·올빼미 위성: laser and lightning
     e_seed: { cd: 0.3, missile: 2.4 },                             // 민들레 위성: three dandelion satellites circle the craft and fire homing missiles
     e_halo: { cd: 0.42, beam: 5, rgb: '205,228,255' },          // 달빛 레이저: two moons fire piercing lasers
     e_octo: { cd: 1.0, dmg: 9, r: 72 },                           // 먹물탄: an ink ball lobbed at the thickest crowd; the splash hits and swallows bullets
@@ -4981,12 +4982,10 @@ function makeShooter() {
       ctx.restore();
     }
     if (P.id === 'e_truman') for (let i = 0; i < 2; i++) {
-      const [sx, sy] = satPos(i), a = time * 2.4 + i * Math.PI + Math.PI / 2, rgb = i ? S2.e_truman.rgbZ : S2.e_truman.rgbL;
+      const [sx, sy] = satPos(i), a = time * 2.4 + (i + 1) * Math.PI, rgb = i ? S2.e_truman.rgbZ : S2.e_truman.rgbL;
+      const plane = PLANES[i ? 3 : 1];
       glowDot(sx, sy, 16, rgb, 0.5);
-      ctx.save(); ctx.translate(sx, sy); ctx.rotate(a);
-      tPoly([13, 0, -9, -8, -4, 0], '#f6f1e6'); tPoly([13, 0, -9, 8, -4, 0], '#e3dccd');
-      ctx.strokeStyle = `rgb(${rgb})`; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(-4, 0); ctx.stroke();
-      ctx.restore();
+      drawPlane(sx, sy, a, 0, 1, time * 40, { ...plane.look, noShadow: true, scale: i ? 0.25 : 0.27 });
     }
     for (const f of secFx) {
       if (f.kind === 'laser') {
@@ -9316,7 +9315,7 @@ function drawPreview(canvas, plane) {
 }
 /* endless mode: every plane whose ending you have seen, refitted pilots and recovered craft */
 // endless only: a second basic weapon that fits each plane
-const SEC2 = { e_truman: '종이 위성·충격파', e_octo: '먹물탄·충격파', e_spider: '전기 실 화살·충격파', e_seed: '민들레 위성·충격파', e_halo: '달빛 레이저·충격파', swallow: '깃털 위성·충격파', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성·충격파', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
+const SEC2 = { e_truman: '매·올빼미 위성·충격파', e_octo: '먹물탄·충격파', e_spider: '전기 실 화살·충격파', e_seed: '민들레 위성·충격파', e_halo: '달빛 레이저·충격파', swallow: '깃털 위성·충격파', hawk: '미사일 위성', ox: '충격파·어뢰', owl: '달빛 위성·충격파', c_twin: '유도탄·충격파', c_beacon: '회전 광선',
   c_cloud: '낙뢰 구름·허리케인', c_fortress: '방패 위성', c_ace: '번개 위성', c_dread: '연쇄 번개' };
 const SEC2ROLE = { e_truman: '위성·연쇄·방어', e_octo: '광역·방어', e_spider: '감전·방어', e_seed: '위성·유도', e_halo: '위성·관통', swallow: '위성·방어', hawk: '위성·유도', ox: '방어·폭탄', owl: '지원·방어', c_twin: '유도·방어', c_beacon: '광역', c_cloud: '광역', c_fortress: '위성·방어', c_ace: '위성·연쇄', c_dread: '연쇄' };
 const REFIT = { swallow: 1.25, hawk: 1.55, ox: 1.2, owl: 1.67 };   // owl base went 0.9 -> 1.0, so its refit keeps the same final power
