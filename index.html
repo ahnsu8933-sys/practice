@@ -2612,7 +2612,8 @@ function drawTrumanPaperGlide(col, blink) {
 }
 // Playable Truman flies head first with both fists forward and legs trailing behind.
 const TRUMAN_CRAFT_COLORS = ['#f5f0e3', '#3864e8', '#263f91', '#172653', '#ffc373'];
-const TRUMAN_CRAFT_LEG_SCALE = 1.25;
+const TRUMAN_BOSS_COLORS = ['#c24b86', '#793783', '#502962', '#2b1a3d', '#ff9c86'];
+const TRUMAN_LEG_SCALE = 1.25;
 function drawTrumanBack(col, blink) {
   const t = time, acc = tAcc(), bank = Math.sin(t * 2.4);
   const [W1, W2, W3, DK, TR] = TRUMAN_CRAFT_COLORS.map(col), opacity = ctx.globalAlpha;
@@ -2631,7 +2632,7 @@ function drawTrumanBack(col, blink) {
   }
   // Legs stay extended while the foot thrusters fire.
   for (const sd of [-1, 1]) {
-    const len = 66 * TRUMAN_CRAFT_LEG_SCALE + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
+    const len = 66 * TRUMAN_LEG_SCALE + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
     const fl = 16 + Math.random() * 10, g = ctx.createLinearGradient(0, fy, 0, fy + fl);
     g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(fx - 7, fy); ctx.lineTo(fx, fy + fl); ctx.lineTo(fx + 7, fy); ctx.closePath(); ctx.fill();
@@ -3192,10 +3193,11 @@ function drawEnemy(e) {
     // 트루먼: a giant armoured robot built to look like a person: broad shoulder armour, an angular chest,
     // a crested helmet, fists and thruster legs. Its face is still a blank mirror that shows the sky,
     // its four thin wings carry the four pilots' colours, and the factory's light still glows in its chest.
-    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.22)'; ctx.beginPath(); ctx.ellipse(18, 104, 74, 18, 0, 0, TAU); ctx.fill(); }
+    if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.22)'; ctx.beginPath(); ctx.ellipse(18, 123, 74, 18, 0, 0, TAU); ctx.fill(); }
     const pose = e.choicePose ?? time, opacity = ctx.globalAlpha;
-    const bob = Math.sin(pose * 1.6) * 3, acc = PLANES.map(p => p.look.accent);
-    const [W1, W2, W3, DK, TR] = (e.craft ? TRUMAN_CRAFT_COLORS : ['#eceaf3', '#c3c0d2', '#8f8ba6', '#3a3852', '#7a52c8']).map(col);
+    const recoil = reduceMotion ? 0 : (1 - clamp((pose - (e.firePoseAt ?? -Infinity)) / 0.27, 0, 1)) ** 2;
+    const bob = Math.sin(pose * 1.6) * 3 - recoil * 4, acc = PLANES.map(p => p.look.accent);
+    const [W1, W2, W3, DK, TR] = (e.craft ? TRUMAN_CRAFT_COLORS : TRUMAN_BOSS_COLORS).map(col);
     const poly = (pts, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); };
     ctx.save(); ctx.translate(0, bob);
     // wings: four thin blades from the back, one per pilot colour
@@ -3215,7 +3217,7 @@ function drawEnemy(e) {
     // legs: thighs, knee guards, heavy shins, blocky feet; each sways a little at the hip, its thruster with it
     for (const sd of [-1, 1]) {
       ctx.save(); ctx.translate(sd * 14, 22);
-      if (e.craft) ctx.scale(1, TRUMAN_CRAFT_LEG_SCALE);
+      ctx.scale(1, TRUMAN_LEG_SCALE);
       ctx.rotate(Math.sin(pose * 1.3 + sd * 1.2) * 0.07); ctx.translate(-sd * 14, -22);
       const fl = 14 + Math.random() * 8, g = ctx.createLinearGradient(0, 92, 0, 92 + fl);
       g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
@@ -3233,7 +3235,8 @@ function drawEnemy(e) {
     for (const sd of [-1, 1]) poly([sd * 12, 12, sd * 26, 14, sd * 27, 34, sd * 15, 32], W2);
     // arms: upper arm, elbow, forearm, fist (a little away from the body)
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(sd * 46, -32); ctx.rotate(sd * (Math.sin(pose * 1.5 + sd * 1.3) * 0.13 + 0.03)); ctx.translate(-sd * 46, 32);
+      ctx.save(); ctx.translate(sd * 46, -32 - recoil * 4);
+      ctx.rotate(sd * (Math.sin(pose * 1.5 + sd * 1.3) * 0.13 + 0.03 + recoil * 0.15)); ctx.translate(-sd * 46, 32);
       poly([sd * 40, -34, sd * 52, -30, sd * 50, -6, sd * 40, -8], W2);
       ctx.fillStyle = DK; ctx.beginPath(); ctx.arc(sd * 46, -5, 6, 0, TAU); ctx.fill();
       poly([sd * 38, -2, sd * 56, 0, sd * 54, 26, sd * 40, 26], W1);
@@ -3255,7 +3258,7 @@ function drawEnemy(e) {
     ctx.fillStyle = '#f3ecff'; ctx.beginPath(); ctx.arc(0, -10, 3.5, 0, TAU); ctx.fill();
     // shoulder armour: big angled blocks with three vents
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(0, Math.sin(time * 1.5 + sd * 1.3) * 1.6);
+      ctx.save(); ctx.translate(0, Math.sin(pose * 1.5 + sd * 1.3) * 1.6 - recoil * 4);
       poly([sd * 28, -54, sd * 58, -50, sd * 62, -30, sd * 36, -28], e.craft ? W2 : W1);
       poly([sd * 28, -54, sd * 58, -50, sd * 57, -44, sd * 30, -47], e.craft ? W1 : W2);
       ctx.fillStyle = DK; for (let k = 0; k < 3; k++) ctx.fillRect(sd > 0 ? 40 + k * 6 : -44 - k * 6, -42, 3, 10);
@@ -3264,10 +3267,10 @@ function drawEnemy(e) {
     }
     // head: helmet with a single crest blade and two short side antennae; the face is a blank mirror
     ctx.fillStyle = DK; ctx.fillRect(-6, -58, 12, 8);
-    ctx.save(); ctx.translate(0, -56); ctx.rotate(Math.sin(time * 0.9) * 0.08); ctx.translate(0, 56);
+    ctx.save(); ctx.translate(0, -56); ctx.rotate(Math.sin(pose * 0.9) * 0.08); ctx.translate(0, 56);
     poly([-14, -84, 14, -84, 16, -64, 10, -56, -10, -56, -16, -64], W1);
     poly([-3, -84, 3, -84, 2, -102, -2, -102], TR);                          // crest blade
-    for (const sd of [-1, 1]) { const q = Math.sin(time * 4 + sd) * 2; poly([sd * 14, -78, sd * 16, -78, sd * 24 + q, -94, sd * 21 + q, -95], W3); }
+    for (const sd of [-1, 1]) { const q = Math.sin(pose * 4 + sd) * 2; poly([sd * 14, -78, sd * 16, -78, sd * 24 + q, -94, sd * 21 + q, -95], W3); }
     const gv = ctx.createLinearGradient(0, -78, 0, -64);
     gv.addColorStop(0, '#2a3a6e'); gv.addColorStop(0.55, '#d07a8e'); gv.addColorStop(1, '#ffd2a0');
     ctx.fillStyle = gv; rr(-11, -77, 22, 12, 4); ctx.fill();
@@ -6910,6 +6913,7 @@ function makeShooter() {
     }
   }
   function fireTrumanAs(e, k, light) {
+    e.firePoseAt = time;
     const tint = hexRgb(PLANES[k].look.accent);
     if (k === 0) {
       e.burst = light ? 5 : 10; e.burstT = 0;
@@ -7841,7 +7845,8 @@ function makeShooter() {
       p.x = clamp(p.x, 22, W - 22);
       p.y = clamp(p.y, 40, lifting ? H + 80 : H - 34);
       const targetTilt = clamp(dxMove / (P.speed * mdt || 1), -1, 1);
-      p.tilt += (targetTilt - p.tilt) * Math.min(1, mdt * 10);
+      const tiltSpeed = P.id === 'e_truman' && !reduceMotion ? (Math.abs(targetTilt) > 0.1 ? 15 : 7) : 10;
+      p.tilt += (targetTilt - p.tilt) * Math.min(1, mdt * tiltSpeed);
       p.inv = Math.max(0, p.inv - dt);
 
       if (p.sub) { p.subT -= dt; if (p.subT <= 0) { p.sub = null; floatText(p.x, p.y - 40, P.weaponName + '(으)로 복귀', '220,210,240'); } }
@@ -8009,7 +8014,7 @@ function makeShooter() {
       if (!player.dead) {
         const blink = player.inv > 0 && !scene && !ult && Math.floor(player.inv * 14) % 2 === 0;
         const truman = P.id === 'e_truman';
-        const heading = truman && !reduceMotion ? player.tilt * 0.14 : 0;
+        const heading = truman && !reduceMotion ? player.tilt * 0.25 : 0;
         const tilt = truman ? player.tilt * 0.55 : player.tilt;
         drawPlane(player.x, player.y, heading, tilt, blink ? 0.35 : 1, player.prop, P.look);
         if (truman && camp.act === 4) drawTrumanSatellites();
