@@ -2058,7 +2058,7 @@ function drawCraft(L) {
   ctx.save();
   ctx.scale(L.art, L.art);
   craftTint = !COLORED_ENDLESS_HULLS.has(L.type);
-  if (L.type === 'truman' && !L.preview) drawEnemy(fake({ type: 'truman_back', rot: 0 }));   // flying: prone, seen from behind
+  if (L.type === 'truman' && !L.preview) drawEnemy(fake({ type: 'truman_back', rot: 0, flightCurrent: L.flightCurrent }));   // flying: prone, seen from behind
   else if (L.type === 'twin') { drawEnemy(fake({ x: -48, k: 1 })); drawEnemy(fake({ x: 48, k: 0 })); }
   else if (L.type === 'ace' || L.type.startsWith('truman') || L.type === 'halo' || L.type === 'seed') drawEnemy(fake({ rot: 0 }));
   else drawEnemy(fake({}));
@@ -2783,11 +2783,69 @@ const TRUMAN_CRAFT_COLORS = ['#f5f0e3', '#3864e8', '#263f91', '#172653', '#ffc37
 const TRUMAN_BOSS_COLORS = ['#c24b86', '#793783', '#502962', '#2b1a3d', '#ff9c86'];
 const TRUMAN_LEG_SCALE = 1.25;
 const TRUMAN_CRAFT_LEG_SCALE = TRUMAN_LEG_SCALE * 0.9;   // the recovered craft in flight: legs 10% shorter
-function drawTrumanBack(col, blink) {
+function drawTrumanCoil(front, rgb, pose, surge = 0) {
+  if (!rgb) return;
+  const phase = reduceMotion ? 0.35 : pose * 3.7 + surge * 0.7;
+  const steps = LITE ? 26 : 40;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (let strand = 0; strand < (surge > 0.15 && !LITE ? 2 : 1); strand++) {
+    const strength = (front ? 0.82 : 0.54) * (strand ? surge * 0.85 : 1);
+    let lastX = 0, lastY = 0;
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const h = i / steps, a = h * TAU * 2.15 + phase + strand * Math.PI;
+      const depth = Math.sin(a);
+      const radius = 34 + 40 * Math.sin(Math.PI * h) + 18 * surge;
+      const jag = (i % 2 ? -1 : 1) * (3 + surge * 5);
+      const x = Math.cos(a) * (radius + jag), y = -82 + h * 196 + depth * 10 + jag;
+      if (i > 0 && (Math.sin(a - TAU * 2.15 / steps / 2) >= 0) === front) {
+        ctx.moveTo(lastX, lastY); ctx.lineTo(x, y);
+      }
+      lastX = x; lastY = y;
+    }
+    ctx.strokeStyle = `rgba(${rgb},${strength * (0.24 + surge * 0.25)})`; ctx.lineWidth = 8 + surge * 12; ctx.stroke();
+    ctx.strokeStyle = `rgba(${rgb},${strength})`; ctx.lineWidth = 3.3 + surge * 4.9; ctx.stroke();
+    ctx.strokeStyle = `rgba(255,250,255,${strength * (0.63 + surge * 0.32)})`; ctx.lineWidth = 1.2 + surge * 1.2; ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawTrumanFlightFlames(rgb, t) {
+  const outer = ctx.createLinearGradient(0, -54, 0, 126);
+  outer.addColorStop(0, `rgba(${rgb},0.88)`);
+  outer.addColorStop(0.55, `rgba(${rgb},0.74)`);
+  outer.addColorStop(1, `rgba(${rgb},0.08)`);
+  const inner = ctx.createLinearGradient(0, -54, 0, 106);
+  inner.addColorStop(0, 'rgba(255,250,232,0.97)');
+  inner.addColorStop(0.48, `rgba(${rgb},0.93)`);
+  inner.addColorStop(1, `rgba(${rgb},0.04)`);
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < (LITE ? 1 : 2); i++) {
+      const x = side * (i ? 28 : 54), y = i ? -9 : -42;
+      const wave = reduceMotion ? 0 : Math.sin(t * (9 + i) + side * 1.8);
+      const length = (i ? 125 : 96) + wave * 12;
+      const width = i ? 17 : 22, tail = x + side * (9 + wave * 11);
+      ctx.fillStyle = outer; ctx.beginPath();
+      ctx.moveTo(x - width * 0.5, y + 9);
+      ctx.bezierCurveTo(x - width, y + 18, x - width * 0.65, y + length * 0.66, tail, y + length);
+      ctx.bezierCurveTo(x + width * 0.65, y + length * 0.63, x + width * 1.12, y + 10, x + width * 0.38, y - 12);
+      ctx.quadraticCurveTo(x - 3, y - 2, x - width * 0.5, y + 9);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = inner; ctx.beginPath();
+      ctx.moveTo(x - width * 0.30, y + 7);
+      ctx.quadraticCurveTo(x - width * 0.36, y + length * 0.42, x + (tail - x) * 0.63, y + length * 0.72);
+      ctx.quadraticCurveTo(x + width * 0.42, y + length * 0.24, x + width * 0.22, y - 4);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+}
+function drawTrumanBack(col, blink, flightCurrent) {
   const t = time, acc = tAcc(), bank = Math.sin(t * 2.4);
   const [W1, W2, W3, DK, TR] = TRUMAN_CRAFT_COLORS.map(col), opacity = ctx.globalAlpha;
   const roll = bank * 0.035;
+  const charge = reduceMotion ? 0.14 : 0.52;
   ctx.save(); ctx.rotate(roll);
+  if (flightCurrent) drawTrumanFlightFlames(flightCurrent, t);
+  drawTrumanCoil(false, flightCurrent, t, charge);
   // wings: spread out and back from the shoulder blades, beating gently
   for (let i = 0; i < 4; i++) {
     const sd = i < 2 ? -1 : 1, up = i % 2 === 0, len = up ? 100 : 78;
@@ -2798,6 +2856,14 @@ function drawTrumanBack(col, blink) {
     ctx.globalAlpha = opacity * 0.95; ctx.fillStyle = g;
     ctx.beginPath(); ctx.moveTo(ox, oy - 6); ctx.lineTo(tx, ty); ctx.lineTo(ox, oy + 8); ctx.closePath(); ctx.fill();
     ctx.globalAlpha = opacity;
+    if (flightCurrent && up && !reduceMotion) {
+      const wave = Math.sin(t * 6 + sd);
+      ctx.beginPath(); ctx.moveTo(tx - sd * 8, ty);
+      ctx.lineTo(tx + sd * 4, ty - 6); ctx.lineTo(tx + sd * 8, ty + 7);
+      ctx.lineTo(tx + sd * (19 + 4 * wave), ty + 3);
+      ctx.strokeStyle = `rgba(${flightCurrent},0.76)`; ctx.lineWidth = 7; ctx.stroke();
+      ctx.strokeStyle = 'rgba(252,247,255,0.92)'; ctx.lineWidth = 2.3; ctx.stroke();
+    }
   }
   // Legs stay extended while the foot thrusters fire.
   for (const sd of [-1, 1]) {
@@ -2843,6 +2909,7 @@ function drawTrumanBack(col, blink) {
   ctx.fillStyle = W2; ctx.beginPath(); ctx.ellipse(0, -70, 15, 16, 0, Math.PI / 2, Math.PI * 1.5); ctx.fill();
   tPoly([-2.5, -88, 2.5, -88, 2, -54, -2, -54], TR);                                   // crest along the top
   for (const sd of [-1, 1]) { const q = Math.sin(t * 4 + sd) * 1.5; tPoly([sd * 12, -66, sd * 14, -66, sd * 22 + q, -50, sd * 19 + q, -49], W3); }
+  drawTrumanCoil(true, flightCurrent, t, charge);
   ctx.restore();
 }
 const hexRgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)).join(',');
@@ -3343,7 +3410,7 @@ function drawEnemy(e) {
       }
       ctx.restore();
     };
-    ringHalf(true);
+    if (!e.separateHalo) ringHalf(true);
     glowDot(0, 0, 100, '87,151,255', 0.24);
     const g = ctx.createRadialGradient(-22, -24, 8, 0, 0, 62);
     g.addColorStop(0, col('#a9e6ff')); g.addColorStop(0.55, col('#4c91ff')); g.addColorStop(1, col('#293eaa'));
@@ -3353,7 +3420,7 @@ function drawEnemy(e) {
     ctx.fillStyle = col('#233b9a'); rr(-15, 36, 30, 13, 5); ctx.fill();
     ctx.fillStyle = col('#d4eaff'); for (const bx of [-11, 11]) { ctx.beginPath(); ctx.arc(bx, 42, 1.6, 0, TAU); ctx.fill(); }
     glowDot(0, 42, e.open ? 22 : 12, '119,175,255', e.open ? 0.95 : 0.55 + 0.45 * blink);
-    ringHalf(false);
+    if (!e.separateHalo) ringHalf(false);
     if (e.open && !e.craft && !e.icon) {   // the way in is open: a gold target ring
       ctx.strokeStyle = `rgba(255,224,140,${0.55 + 0.35 * blink})`; ctx.lineWidth = 2.5; ctx.setLineDash([7, 6]);
       ctx.beginPath(); ctx.arc(0, 0, 68, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
@@ -3365,16 +3432,43 @@ function drawEnemy(e) {
     // its four thin wings carry the four pilots' colours, and the factory's light still glows in its chest.
     if (!e.craft) { ctx.fillStyle = 'rgba(20,10,30,0.22)'; ctx.beginPath(); ctx.ellipse(18, 123, 74, 18, 0, 0, TAU); ctx.fill(); }
     const pose = e.choicePose ?? time, opacity = ctx.globalAlpha;
-    const recoil = reduceMotion ? 0 : (1 - clamp((pose - (e.firePoseAt ?? -Infinity)) / 0.27, 0, 1)) ** 2;
-    const bob = Math.sin(pose * 1.6) * 3 - recoil * 4, acc = PLANES.map(p => p.look.accent);
+    const shotAge = pose - (e.firePoseAt ?? -Infinity);
+    const fighting = e.isBoss && e.arrived && e.choicePose === undefined;
+    const windup = e.mimic === undefined ? 0 : 1 - clamp(e.shotT / 0.14, 0, 1);
+    const spread = fighting ? (e.firePoseAt === undefined ? windup : 1) : 0;
+    const charged = fighting && e.firePoseAt !== undefined;
+    const surge = charged && !reduceMotion ? 1 - clamp(shotAge / 0.42, 0, 1) : 0;
+    const guard = e.guardPose || 0;
+    const bob = Math.sin(pose * 1.6) * 3, acc = PLANES.map(p => p.look.accent);
     const [W1, W2, W3, DK, TR] = (e.craft ? TRUMAN_CRAFT_COLORS : TRUMAN_BOSS_COLORS).map(col);
     const poly = (pts, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]); ctx.closePath(); ctx.fill(); };
+    const currentColor = charged ? hexRgb(acc[e.mimic ?? 0]) : '';
+    const current = (x, y, tx, ty, delay) => {
+      const age = shotAge - delay;
+      if (!surge || age < 0 || age >= 0.29) return;
+      const progress = clamp(age / 0.10, 0, 1), fade = 1 - clamp((age - 0.11) / 0.18, 0, 1);
+      const dx = (tx - x) * progress, dy = (ty - y) * progress, len = Math.hypot(dx, dy) || 1;
+      const bends = LITE ? 2 : 4;
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(x, y);
+      for (let j = 1; j < bends; j++) {
+        const wobble = (j % 2 ? 1 : -1) * (4 + 4 * Math.sin(shotAge * 37 + j * 3)) * progress;
+        ctx.lineTo(x + dx * j / bends - dy / len * wobble, y + dy * j / bends + dx / len * wobble);
+      }
+      ctx.lineTo(x + dx, y + dy);
+      ctx.strokeStyle = `rgba(${currentColor},${0.46 * fade})`; ctx.lineWidth = 11; ctx.stroke();
+      ctx.strokeStyle = `rgba(${currentColor},${fade})`; ctx.lineWidth = 4.8; ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,248,${0.90 * fade})`; ctx.lineWidth = 1.7; ctx.stroke();
+      ctx.restore();
+    };
     ctx.save(); ctx.translate(0, bob);
+    drawTrumanCoil(false, currentColor, pose, surge);
     // wings: four thin blades from the back, one per pilot colour
     for (let i = 0; i < 4; i++) {
       const sd = i < 2 ? -1 : 1, up = i % 2 === 0, len = up ? 104 : 80, a0 = sd > 0 ? (up ? -0.55 : -0.05) : Math.PI - (up ? -0.55 : -0.05);
       const sw = Math.sin(pose * 1.8 + (up ? 0 : 0.7)) * 0.17 + Math.sin(pose * 3.1 + i) * 0.03, ox = sd * 22, oy = -40;
-      const tx = ox + Math.cos(a0 + sd * sw) * len, ty = oy + Math.sin(a0 + sd * sw) * len;
+      const wingAngle = a0 + sd * (sw + 0.40 * Math.max(spread, guard));
+      const tx = ox + Math.cos(wingAngle) * len, ty = oy + Math.sin(wingAngle) * len;
       const gw = ctx.createLinearGradient(ox, oy, tx, ty);
       gw.addColorStop(0, W2); gw.addColorStop(1, col(acc[i]));
       const wingAlpha = 1 - clamp((e.choiceFade || 0) * 5 - i, 0, 1);
@@ -3383,12 +3477,16 @@ function drawEnemy(e) {
       ctx.globalAlpha *= e.mimic === undefined || e.mimic === i ? 0.95 : 0.55; ctx.fillStyle = gw;
       ctx.beginPath(); ctx.moveTo(ox, oy - 5); ctx.lineTo(tx, ty); ctx.lineTo(ox + sd * 8, oy + 9); ctx.closePath(); ctx.fill();
       ctx.globalAlpha = opacity;
+      current(ox, oy, tx, ty, up ? 0.10 : 0.12);
     }
     // legs: thighs, knee guards, heavy shins, blocky feet; each sways a little at the hip, its thruster with it
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(sd * 14, 22);
-      ctx.scale(1, TRUMAN_LEG_SCALE);
-      ctx.rotate(Math.sin(pose * 1.3 + sd * 1.2) * 0.07); ctx.translate(-sd * 14, -22);
+      const slideSide = e.guardSlideSide || 0, leading = sd === slideSide;
+      ctx.save(); ctx.translate(sd * 14, 22 - 8 * spread - (leading ? 15 * guard : 0));
+      ctx.scale(1, TRUMAN_LEG_SCALE * (leading ? 1 - 0.25 * guard : 1));
+      ctx.rotate(Math.sin(pose * 1.3 + sd * 1.2) * 0.07 - sd * 0.24 * spread
+        + slideSide * guard * (leading ? -0.25 : 0.55));
+      ctx.translate(-sd * 14, -22);
       const fl = 14 + Math.random() * 8, g = ctx.createLinearGradient(0, 92, 0, 92 + fl);
       g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(sd * 15 - 7, 92); ctx.lineTo(sd * 15, 92 + fl); ctx.lineTo(sd * 15 + 7, 92); ctx.closePath(); ctx.fill();
@@ -3397,6 +3495,7 @@ function drawEnemy(e) {
       poly([sd * 6, 40, sd * 25, 38, sd * 22, 54, sd * 9, 54], W3);            // knee guard
       ctx.fillStyle = DK; for (let k = 0; k < 3; k++) ctx.fillRect(sd > 0 ? 12 : -22, 60 + k * 6, 10, 2.5);   // shin vents
       poly([sd * 3, 84, sd * 29, 82, sd * 31, 94, sd * 1, 94], W3);            // feet
+      current(sd * 13, 23, sd * 15, 90, 0.08);
       ctx.restore();
     }
     // waist and skirt armour
@@ -3404,17 +3503,29 @@ function drawEnemy(e) {
     poly([-9, 14, 9, 14, 7, 36, -7, 36], W1);
     for (const sd of [-1, 1]) poly([sd * 12, 12, sd * 26, 14, sd * 27, 34, sd * 15, 32], W2);
     // arms: upper arm, elbow, forearm, fist (a little away from the body)
-    for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(sd * 46, -32 - recoil * 4);
-      ctx.rotate(sd * (Math.sin(pose * 1.5 + sd * 1.3) * 0.13 + 0.03 + recoil * 0.15)); ctx.translate(-sd * 46, 32);
+    const drawArms = () => { for (const sd of [-1, 1]) {
+      ctx.save(); ctx.translate(sd * 46, -32 - 10 * spread);
+      const idleArm = sd * (Math.sin(pose * 1.5 + sd * 1.3) * 0.13 + 0.03 - 0.92 * spread);
+      ctx.rotate(idleArm * (1 - guard) + sd * 2.36 * guard);
+      ctx.translate(-sd * 46, 32);
       poly([sd * 40, -34, sd * 52, -30, sd * 50, -6, sd * 40, -8], W2);
       ctx.fillStyle = DK; ctx.beginPath(); ctx.arc(sd * 46, -5, 6, 0, TAU); ctx.fill();
+      current(sd * 46, -31, sd * 46, -5, 0.09);
+      // A shorter forearm and larger fist make the bend read toward the camera.
+      const forearmDepth = 1 - 0.42 * spread;
+      ctx.save(); ctx.translate(0, -5); ctx.scale(1, forearmDepth); ctx.translate(0, 5);
       poly([sd * 38, -2, sd * 56, 0, sd * 54, 26, sd * 40, 26], W1);
       ctx.fillStyle = TR; ctx.fillRect(sd > 0 ? 40 : -54, 8, 14, 3);
+      current(sd * 46, -5, sd * 46, 26, 0.13);
+      ctx.restore();
+      const fistSize = 1 + 0.22 * spread;
+      ctx.translate(sd * 46, -5 + 31 * forearmDepth);
+      ctx.scale(fistSize, fistSize); ctx.translate(-sd * 46, -26);
       ctx.fillStyle = W3; rr(sd > 0 ? 39 : -55, 26, 16, 14, 4); ctx.fill();   // fist
       ctx.fillStyle = DK; for (let k = 0; k < 3; k++) ctx.fillRect(sd > 0 ? 41 + k * 4.5 : -53 + k * 4.5, 29, 3, 8);
       ctx.restore();
-    }
+    } };
+    if (!guard) drawArms();
     // chest: a broad angular plate with vents and the factory's light in a hexagonal core
     poly([-34, -46, 34, -46, 30, -16, 18, 6, -18, 6, -30, -16], W1);
     poly([-34, -46, 34, -46, 31, -38, -31, -38], W2);
@@ -3428,7 +3539,7 @@ function drawEnemy(e) {
     ctx.fillStyle = '#f3ecff'; ctx.beginPath(); ctx.arc(0, -10, 3.5, 0, TAU); ctx.fill();
     // shoulder armour: big angled blocks with three vents
     for (const sd of [-1, 1]) {
-      ctx.save(); ctx.translate(0, Math.sin(pose * 1.5 + sd * 1.3) * 1.6 - recoil * 4);
+      ctx.save(); ctx.translate(0, Math.sin(pose * 1.5 + sd * 1.3) * 1.6);
       poly([sd * 28, -54, sd * 58, -50, sd * 62, -30, sd * 36, -28], e.craft ? W2 : W1);
       poly([sd * 28, -54, sd * 58, -50, sd * 57, -44, sd * 30, -47], e.craft ? W1 : W2);
       ctx.fillStyle = DK; for (let k = 0; k < 3; k++) ctx.fillRect(sd > 0 ? 40 + k * 6 : -44 - k * 6, -42, 3, 10);
@@ -3445,11 +3556,19 @@ function drawEnemy(e) {
     gv.addColorStop(0, '#2a3a6e'); gv.addColorStop(0.55, '#d07a8e'); gv.addColorStop(1, '#ffd2a0');
     ctx.fillStyle = gv; rr(-11, -77, 22, 12, 4); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(-10 + ((time * 0.45) % 1) * 15, -75, 6, 2);
+    if (e.cracked) {
+      ctx.strokeStyle = '#fff2fa'; ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.moveTo(-8, -77); ctx.lineTo(-2, -72); ctx.lineTo(-4, -68); ctx.lineTo(6, -65);
+      ctx.moveTo(-2, -72); ctx.lineTo(7, -75); ctx.stroke();
+    }
     poly([-7, -62, 7, -62, 4, -56, -4, -56], W2);                            // chin guard
     ctx.restore();
+    if (guard) drawArms();
+    for (const sd of [-1, 1]) current(0, -10, sd * 49, -39, 0);
+    drawTrumanCoil(true, currentColor, pose, surge);
     ctx.restore();
 
-  } else if (e.type === 'truman_back') { drawTrumanBack(col, blink);
+  } else if (e.type === 'truman_back') { drawTrumanBack(col, blink, e.flightCurrent);
   } else if (e.type === 'truman_knight') { drawTrumanKnight(col, blink);
   } else if (e.type === 'truman_samurai') { drawTrumanSamurai(col, blink);
   } else if (e.type === 'truman_super') { drawTrumanSuper(col, blink);
@@ -4373,7 +4492,9 @@ function makeShooter() {
   }
   let trumanChoice = null;
   // last copy · 달무리's afterglow and the warning line · "…싫어" · it slides in front · the beam hits it · "…나도, 그거 할래" · it goes out
-  const TRUMAN_STOP = 1.5, TRUMAN_LINE = 1.6, TRUMAN_GUARD = 2.1, TRUMAN_HIT = 2.35, TRUMAN_SAY = 3.0, TRUMAN_FADE = 5.0, TRUMAN_END = 6.5;
+  const TRUMAN_STOP = 1.5, TRUMAN_LINE = 1.6, TRUMAN_AIM = 1.78, TRUMAN_GUARD = 2.1;
+  const TRUMAN_HIT = 2.49, TRUMAN_SAY = 3.0, TRUMAN_FADE = 5.0, TRUMAN_END = 6.5;
+  const TRUMAN_GUARD_CONTACT = 78;
   const turretsLeft = () => enemies.some(o => o.type === 'turret' && !o.dead);
   const later = (delay, fn) => timers.push({ t: delay, fn });
   const storyOn = () => camp.act === 1 && !camp.attack;
@@ -6908,18 +7029,27 @@ function makeShooter() {
     // the player drifts to a steady place low on the screen; the afterglow stays above them
     const k = Math.min(1, dt * 4);
     player.x += (c.gx - player.x) * k; player.y += (H - 150 - player.y) * k;
-    // 트루먼 slides in between, then holds there
+    // Carry the slide through impact, then let the thrust settle.
     const gy = H - 150 - 175;
-    const slide = clamp((c.t - TRUMAN_GUARD) / (TRUMAN_HIT - TRUMAN_GUARD), 0, 1), ease = slide * slide * (3 - 2 * slide);
-    e.x = c.x + (c.gx - c.x) * ease + (c.t > TRUMAN_HIT ? Math.sin((c.t - TRUMAN_HIT) * 2.2) * 3 : 0);
-    e.y = c.y + (gy - c.y) * ease;
-    e.rot = (c.gx - c.x) * 0.0012 * Math.sin(Math.PI * slide);
+    const slide = clamp((c.t - TRUMAN_GUARD) / (TRUMAN_HIT - TRUMAN_GUARD), 0, 1), travel = slide ** 1.35;
+    const impactTime = c.t - TRUMAN_HIT;
+    const side = c.gx >= c.x ? 1 : -1;
+    const settle = 1 - clamp((impactTime - 0.14) / 0.44, 0, 1);
+    const carry = reduceMotion ? 0 : side * 17 * (1 - (1 - clamp(impactTime / 0.23, 0, 1)) ** 2) * settle;
+    const recoil = reduceMotion || impactTime < 0 ? 0 : Math.sin(clamp(impactTime / 0.42, 0, 1) * Math.PI) * 13;
+    e.rot = reduceMotion ? 0 : side * 0.37 * Math.sin(slide * Math.PI * 0.5) * settle;
+    const braceX = c.gx - Math.sin(e.rot) * TRUMAN_GUARD_CONTACT;
+    e.x = c.x + (braceX - c.x) * travel + carry;
+    e.y = c.y + (gy - c.y) * travel + recoil;
+    e.guardSlideSide = reduceMotion ? 0 : side;
+    e.guardPose = clamp((slide - 0.38) / 0.53, 0, 1) * (1 - clamp((impactTime - 0.22) / 0.36, 0, 1));
     if (before < TRUMAN_HIT && c.t >= TRUMAN_HIT) {
       // the beam strikes 트루먼, not the player: mirror shards scatter, the screen shakes (both follow the settings)
       e.cracked = true;
-      shake = Math.max(shake, 0.55); flashColor = '236,230,255'; flashT = 0.4;
-      spark(e.x, e.y - 40, '232,231,255', 26, 260); spark(e.x, e.y - 40, '190,170,255', 14, 180);
-      parts.push({ kind: 'wave', x: e.x, y: e.y - 40, life: 0.6, max: 0.6, size: 320, color: '236,230,255' });
+      shake = Math.max(shake, 0.44); flashColor = '236,230,255'; flashT = 0.22;
+      const impactX = e.x + Math.sin(e.rot) * TRUMAN_GUARD_CONTACT;
+      const impactY = e.y - Math.cos(e.rot) * TRUMAN_GUARD_CONTACT;
+      spark(impactX, impactY, '232,231,255', 18, 220); spark(impactX, impactY, '190,170,255', 10, 160);
       boom(0.6, 0.2, 1400); tone(1320, 0.3, 'triangle', 0.035, 500);
       buzz([30, 30, 60]);
     }
@@ -6937,55 +7067,76 @@ function makeShooter() {
     const next = [TRUMAN_GUARD, TRUMAN_SAY, TRUMAN_FADE, TRUMAN_END].find(b => b > t + 0.01);
     if (next !== undefined) updateTrumanChoice(next - t);
   }
+  function drawTrumanAfterglow(t, x, y) {
+    const age = t - TRUMAN_STOP, after = t - TRUMAN_HIT;
+    if (age < 0 || after > 0.92) return;
+    const moon = clamp((age - 0.12) / 0.19, 0, 1) * (1 - clamp((after - 0.12) / 0.29, 0, 1));
+    ctx.save();
+    ctx.globalAlpha = 0.85 * moon;
+    ctx.translate(x, y); ctx.scale(0.5, 0.5);
+    if (moon > 0) drawEnemy({ type: 'halo', x: 0, y: 0, hp: 1, maxHp: 1, craft: true, separateHalo: true });
+    ctx.restore();
+    for (let i = 0; i < 3; i++) {
+      const delay = i * 0.045;
+      const light = clamp((age - delay) / 0.12, 0, 1) * (1 - clamp((after - 0.28 - delay * 3) / 0.32, 0, 1));
+      if (light <= 0) continue;
+      const arc = i * TAU / 3 + clamp(age, 0, 0.85) * (reduceMotion ? 0 : 1.1);
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(x, y + 3, 59, 17, -0.23, arc, arc + 1.37);
+      ctx.strokeStyle = `rgba(76,153,255,${light * 0.26})`; ctx.lineWidth = 8; ctx.stroke();
+      ctx.strokeStyle = `rgba(116,221,255,${light})`; ctx.lineWidth = 2.4; ctx.stroke();
+      ctx.restore();
+    }
+    const fog = (1 - clamp(age / 0.37, 0, 1)) * clamp(age / 0.07, 0, 1);
+    if (fog > 0) for (const sd of [-1, 1]) glowDot(x + sd * (26 + age * 64), y + sd * 13, 58, '96,75,151', fog * 0.61);
+    if (t >= TRUMAN_AIM && t < TRUMAN_HIT) {
+      const aim = clamp((t - TRUMAN_AIM) / 0.22, 0, 1);
+      glowDot(x, y + 27, 15 + 8 * aim, '255,80,117', aim * 0.9);
+      label('달무리 · 잔광', clamp(x, 95, W - 95), y - 61, '#c9b6ff', 'center');
+      label(ENDLESS_TALK.guardGlow, clamp(x, 130, W - 130), y - 43, '#f4f0ff', 'center');
+    }
+  }
   function drawTrumanChoice() {
-    const { e, t, gx } = trumanChoice;
+    const { e, t, gx, x, y } = trumanChoice;
     if (t < TRUMAN_STOP) for (const other of enemies) if (other !== e && !other.dead) drawEnemy(other);
     const shade = clamp(t / 0.35, 0, 1) * (1 - clamp((t - TRUMAN_FADE) / 1.2, 0, 1));
     ctx.fillStyle = `rgba(14,12,38,${shade * 0.62})`; ctx.fillRect(0, 0, W, H);
     const gyTop = 118;
-    // the red warning line on the player, 0.6 s
-    if (t >= TRUMAN_STOP && t < TRUMAN_GUARD + 0.25) {
-      const a = (0.55 + 0.45 * Math.sin(t * 30)) * clamp((TRUMAN_GUARD + 0.25 - t) / 0.2, 0, 1);
+    drawTrumanAfterglow(t, gx, gyTop);
+    if (t >= TRUMAN_AIM && t < TRUMAN_HIT) {
+      const reach = clamp((t - TRUMAN_AIM) / 0.16, 0, 1), y0 = gyTop + 28;
+      const a = 0.72 + 0.18 * Math.sin(t * 19);
       ctx.save(); ctx.strokeStyle = `rgba(255,70,90,${a})`; ctx.lineWidth = 3; ctx.setLineDash([12, 8]);
-      ctx.beginPath(); ctx.moveTo(gx, gyTop + 30); ctx.lineTo(gx, player.y); ctx.stroke(); ctx.setLineDash([]);
-      ctx.beginPath(); ctx.arc(player.x, player.y, 26, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx, y0); ctx.lineTo(gx, y0 + (player.y - y0) * reach); ctx.stroke(); ctx.setLineDash([]);
+      if (reach === 1) { ctx.beginPath(); ctx.arc(player.x, player.y, 26, 0, TAU); ctx.stroke(); }
       ctx.restore();
     }
-    // the beam: thick, from the afterglow down to 트루먼, never past it
-    if (t >= TRUMAN_HIT && t < TRUMAN_HIT + 0.45) {
-      const a = 1 - clamp((t - TRUMAN_HIT - 0.25) / 0.2, 0, 1), w = 44 * (0.6 + 0.4 * a), y1 = e.y - 60;
-      const g = ctx.createLinearGradient(gx - w, 0, gx + w, 0);
+    const beam = t >= TRUMAN_HIT ? 1 - clamp((t - TRUMAN_HIT - 0.16) / 0.20, 0, 1) : 0;
+    const contactX = e.x + Math.sin(e.rot) * TRUMAN_GUARD_CONTACT;
+    const contactY = e.y - Math.cos(e.rot) * TRUMAN_GUARD_CONTACT;
+    if (beam > 0) {
+      const a = beam, w = 22 * (0.6 + 0.4 * a);
+      const dx = contactX - gx, dy = contactY - gyTop - 27;
+      ctx.save(); ctx.translate(gx, gyTop + 27); ctx.rotate(Math.atan2(-dx, dy));
+      const g = ctx.createLinearGradient(-w, 0, w, 0);
       g.addColorStop(0, 'rgba(255,120,160,0)'); g.addColorStop(0.35, `rgba(255,170,200,${0.7 * a})`); g.addColorStop(0.5, `rgba(255,250,255,${a})`);
       g.addColorStop(0.65, `rgba(255,170,200,${0.7 * a})`); g.addColorStop(1, 'rgba(255,120,160,0)');
-      ctx.fillStyle = g; ctx.fillRect(gx - w, gyTop + 20, w * 2, y1 - gyTop - 20);
-      glowDot(gx, y1, 70 * a, '255,236,250', 0.9 * a);
+      ctx.fillStyle = g; ctx.fillRect(-w, 0, w * 2, Math.hypot(dx, dy)); ctx.restore();
     }
-    ctx.save(); ctx.globalAlpha = 1 - (e.choiceFade || 0); drawEnemy(e);
-    if (e.cracked) {   // cracks across its mirror
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.6;
+    if (!reduceMotion && t > TRUMAN_GUARD && t < TRUMAN_HIT) {
+      const dx = (e.x - x) * 0.58, dy = (e.y - y) * 0.58;
+      const strength = Math.sin((t - TRUMAN_GUARD) / (TRUMAN_HIT - TRUMAN_GUARD) * Math.PI);
+      ctx.strokeStyle = `rgba(195,143,255,${0.58 * strength})`; ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(e.x - 6, e.y - 70); ctx.lineTo(e.x + 4, e.y - 52); ctx.lineTo(e.x - 8, e.y - 34); ctx.lineTo(e.x + 10, e.y - 14);
-      ctx.moveTo(e.x + 4, e.y - 52); ctx.lineTo(e.x + 22, e.y - 46);
-      ctx.moveTo(e.x - 8, e.y - 34); ctx.lineTo(e.x - 26, e.y - 26);
+      for (const offset of [-29, 0, 29]) {
+        ctx.moveTo(e.x + offset, e.y + 18);
+        ctx.lineTo(e.x + offset - dx, e.y + 18 - dy);
+      }
       ctx.stroke();
     }
+    ctx.save(); ctx.globalAlpha = 1 - (e.choiceFade || 0); drawEnemy(e);
     ctx.restore();
-    // 달무리's afterglow: the moon and its ring, faint, above the player; it goes out after its shot
-    const glow = clamp((t - TRUMAN_STOP) / 0.3, 0, 1) * (1 - clamp((t - TRUMAN_HIT - 0.25) / 0.45, 0, 1));
-    if (glow > 0) {
-      ctx.save(); ctx.globalAlpha = glow * 0.8;
-      ctx.translate(gx, gyTop); ctx.scale(0.5, 0.5);
-      drawEnemy({ type: 'halo', x: 0, y: 0, hp: 1, maxHp: 1, flash: 0, craft: true, rot: 0 });
-      ctx.restore();
-      glowDot(gx, gyTop, 70, '255,90,120', glow * (0.35 + 0.15 * Math.sin(t * 18)));
-      if (t < TRUMAN_HIT) {   // its signal, once, small, just above it
-        const lx = clamp(gx, 130, W - 130);
-        ctx.save(); ctx.globalAlpha = glow * clamp((t - TRUMAN_STOP - 0.1) / 0.3, 0, 1);
-        label('달무리 · 잔광', lx, gyTop - 86, '#c9b6ff', 'center');
-        label(ENDLESS_TALK.guardGlow, lx, gyTop - 66, '#f4f0ff', 'center');
-        ctx.restore();
-      }
-    }
+    if (beam > 0) glowDot(contactX, contactY, 26 * beam + 6, '255,238,250', beam * 0.84);
     if (e.choiceFade > 0) glowDot(e.x, e.y, 74 - 48 * e.choiceFade, '255,255,255', Math.sin(Math.PI * e.choiceFade) * 0.9);
     drawEnemyBullets(eb); drawParts();
     drawPlane(player.x, player.y, 0, player.tilt, 1, player.prop, P.look);
@@ -6999,7 +7150,7 @@ function makeShooter() {
       lines.forEach((l, i) => bigText(l, W / 2, y + 26 + i * 32, 24, 'center'));
       ctx.restore();
     };
-    say(['…싫어. 이건, 내가 고를래.'], TRUMAN_LINE, TRUMAN_SAY);
+    say(['…싫어. 이건, 내가 고를래.'], TRUMAN_LINE, TRUMAN_HIT);
     say(ENDLESS_TALK.guardSay, TRUMAN_SAY, TRUMAN_FADE + 0.6);
     if (t >= TRUMAN_LINE) label('화면 누르기 ▶', W - 22, H - 32, '#e7dff7', 'right');
   }
@@ -8392,7 +8543,8 @@ function makeShooter() {
         const truman = P.id === 'e_truman';
         const heading = truman && !reduceMotion ? player.tilt * 0.25 : 0;
         const tilt = truman ? player.tilt * 0.55 : player.tilt;
-        drawPlane(player.x, player.y, heading, tilt, blink ? 0.35 : 1, player.prop, P.look);
+        const look = truman ? { ...P.look, flightCurrent: hexRgb(PLANES[mimicI].look.accent) } : P.look;
+        drawPlane(player.x, player.y, heading, tilt, blink ? 0.35 : 1, player.prop, look);
         if (truman && camp.act === 4) drawTrumanSatellites();
         const mini = (type, x, y, sc) => { ctx.save(); ctx.translate(x, y); ctx.scale(sc, sc); drawEnemy({ type, x: 0, y: 0, t: 0, flash: 0, hp: 1, maxHp: 1, k: 0, craft: true, rot: Math.PI }); ctx.restore(); };
         if (P.weapon === 'net') for (let i = 0; i < 2; i++) { const [bx, by] = babyPos(i); mini('spider', bx, by, 0.12); }
