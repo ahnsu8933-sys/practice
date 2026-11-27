@@ -71,10 +71,12 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #pauseBtn { top: 10px; right: 10px; }
 /* the gear: no word on screen, a 44px target; beside the pause button while paused */
 #gearBtn { top: 10px; right: max(10px, env(safe-area-inset-right, 0px)); width: 44px; height: 44px; padding: 0; display: grid; place-items: center; color: var(--muted); border-color: transparent; background: rgba(20, 22, 48, 0.35); }
+#gearBtn:not([hidden]) { animation: gearIn 0.35s ease-out; }
+@keyframes gearIn { from { opacity: 0; transform: scale(0.8); } }
 #gearBtn.in-pause { right: calc(max(10px, env(safe-area-inset-right, 0px)) + 56px); }
 #gearBtn:hover, #gearBtn:focus-visible, #gearBtn:active { color: var(--flare); }
 #gearBtn svg, .set-head svg { display: block; transition: transform 0.28s ease-out; }
-@media (prefers-reduced-motion: reduce) { #gearBtn svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #gearBtn svg { transition: none; } #gearBtn:not([hidden]) { animation: none; } }
 /* the settings window: a small card in the middle; the title and x stay put, only the list scrolls */
 #setScr { justify-content: center; padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px)); background: rgba(8, 10, 28, 0.62); overflow: hidden; z-index: 6; }
 .set-box { width: min(380px, 100%); max-height: 100%; display: flex; flex-direction: column; background: rgba(26, 28, 60, 0.97); border: 1px solid var(--card-line); border-radius: 16px; box-shadow: 0 16px 40px rgba(0,0,0,0.45); text-align: left; overflow: hidden; }
@@ -2758,6 +2760,7 @@ function drawTrumanPaperGlide(col, blink) {
 const TRUMAN_CRAFT_COLORS = ['#f5f0e3', '#3864e8', '#263f91', '#172653', '#ffc373'];
 const TRUMAN_BOSS_COLORS = ['#c24b86', '#793783', '#502962', '#2b1a3d', '#ff9c86'];
 const TRUMAN_LEG_SCALE = 1.25;
+const TRUMAN_CRAFT_LEG_SCALE = TRUMAN_LEG_SCALE * 0.9;   // the recovered craft in flight: legs 10% shorter
 function drawTrumanBack(col, blink) {
   const t = time, acc = tAcc(), bank = Math.sin(t * 2.4);
   const [W1, W2, W3, DK, TR] = TRUMAN_CRAFT_COLORS.map(col), opacity = ctx.globalAlpha;
@@ -2776,7 +2779,7 @@ function drawTrumanBack(col, blink) {
   }
   // Legs stay extended while the foot thrusters fire.
   for (const sd of [-1, 1]) {
-    const len = 66 * TRUMAN_LEG_SCALE + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
+    const len = 66 * TRUMAN_CRAFT_LEG_SCALE + bank * 1.5, hx = sd * 10, hy = 22, fx = sd * 12, fy = hy + len;
     const fl = 16 + Math.random() * 10, g = ctx.createLinearGradient(0, fy, 0, fy + fl);
     g.addColorStop(0, 'rgba(230,220,255,0.95)'); g.addColorStop(1, 'rgba(150,110,255,0)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(fx - 7, fy); ctx.lineTo(fx, fy + fl); ctx.lineTo(fx + 7, fy); ctx.closePath(); ctx.fill();
@@ -6080,12 +6083,15 @@ function makeShooter() {
     ctx.font = '13px "Gowun Dodum", sans-serif'; ctx.fillStyle = cr ? cr.look.accent : lead.look.accent;
     ctx.fillText(cr ? cr.title + ' ' + cr.name + ' · ' + lead.pilot.name : kind === 'final' ? lead.pilot.name + ' · 새벽 편대' : lead.pilot.name + ' · ' + lead.name, 120, 526);
     ctx.font = '15px "Gowun Dodum", sans-serif';
-    let y = 566;
-    E.text.forEach((line, i) => {
+    const rows = E.text.map(line => wrapText(line, W - 56)), nRows = rows.reduce((n, r) => n + r.length, 0);
+    const tight = 566 + nRows * 22 + (rows.length - 1) * 6 > 652;
+    const lh = tight ? 20 : 22, gap = tight ? 3 : 6;
+    let y = tight ? 552 : 566;
+    rows.forEach((rs, i) => {
       const a = clamp((t - 1.4 - i * 1.5) / 0.8, 0, 1);
       ctx.fillStyle = `rgba(246,236,217,${a})`;
-      for (const row of wrapText(line, W - 56)) { ctx.fillText(row, 28, y); y += 22; }
-      y += 6;
+      for (const row of rs) { ctx.fillText(row, 28, y); y += lh; }
+      y += gap;
     });
     ctx.textAlign = 'center';
     const sa = clamp((t - 6.2) / 0.8, 0, 1);
@@ -6782,7 +6788,7 @@ function makeShooter() {
       ctx.fillStyle = `rgba(255,235,190,${al * (1 - i / 11) * 0.8})`;
       ctx.beginPath(); ctx.arc(190 + Math.sin(i + t * 2) * 6, y + 50 + i * 14 + bob, Math.max(1, 4 - i * 0.25), 0, TAU); ctx.fill();
     }
-    drawPlane(190, y + bob, 0, 0, al, t * 40, Object.assign({}, c.look, { noShadow: true, scale: 2.2, preview: gallery && c.id === 'e_truman' }));
+    drawPlane(190, y + bob, 0, 0, al, t * 40, Object.assign({}, c.look, { noShadow: true, scale: 2.2, preview: true }));
   }
   function finalEndingScene(t, al) {
     const sy = 430 - Math.min(t, 6) * 18;
@@ -9439,6 +9445,8 @@ function renderSettings() {
   $('setClearMsg').hidden = !setUI.clearAsk;
   $('setVer').textContent = '구름바다 요격전 · ' + GAME_VERSION;
 }
+// the gear waits for the title intro to finish, then shows with the main screen
+const gearShown = () => (App.mode === 'menu' && !introRun) || App.mode === 'paused';
 function runLabel(r) {
   const c = r.camp || {}, nm = c.endless ? (c.craft ? craftById(c.craft).name : PLANES[c.endPlane !== undefined ? c.endPlane : r.plane].name) : PLANES[r.plane].pilot.name;
   return `${nm} · ${DIFFS[r.diff].name} · STAGE ${r.stage} · 점수 ${fmt(r.score)}`;
@@ -9450,7 +9458,7 @@ function syncUI() {
   $('pauseScr').hidden = !(m === 'paused' || (setOpen && App.setFrom === 'paused'));
   $('menuScr').inert = setOpen; $('pauseScr').inert = setOpen;   // the screen behind takes no taps or keys
   $('setScr').hidden = !setOpen;
-  $('gearBtn').hidden = !(m === 'menu' || m === 'paused');
+  $('gearBtn').hidden = !gearShown();
   $('gearBtn').classList.toggle('in-pause', m === 'paused');
   if (setOpen) renderSettings();
   $('dailyScr').hidden = m !== 'daily';
@@ -10039,6 +10047,8 @@ function update(dt) {
     }
     if (b.style.opacity !== o) b.style.opacity = o;
   }
+  const gb = $('gearBtn'), showG = gearShown();
+  if (gb.hidden === showG) gb.hidden = !showG;
   const sk = $('skipBtn'), showS = App.mode === 'play' && !tipOn && !!App.game && !!App.game.inScene && App.game.inScene();
   if (sk.hidden === showS) sk.hidden = !showS;
   if (banner.t > 0 && App.mode === 'play') banner.t -= dt;
