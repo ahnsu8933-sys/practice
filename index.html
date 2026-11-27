@@ -4120,18 +4120,19 @@ const ENDLESS_CRAFTS = [
 ];
 // the endless story on the radio. debut: shown once as a scene; again: one line, without stopping play; down: the boss's last signal
 const MOM_QUOTE = BOSS_INFO.whale.last.split('엄마는 괜찮아. ')[1];   // 엄마 때문에 네가 좋아하는 하늘을 미워하지 마라.
-const SKY_QUOTE = BOSS_INFO.dread.intro.split(' …')[0];               // 오지 말라고 했잖아.
+const SKY_QUOTE = BOSS_INFO.dread.intro;                              // 오지 말라고 했잖아. …여기서부터는, 내가 아니야.
 const ENDLESS_TALK = {
   // before 트루먼 shows itself: a voice in the factory's wreck learns to talk from the radio it kept (once each, after that stage's boss radio)
   listen: {
     76: [['관제탑', '공장 잔해에서 우리 옛 무전을 되풀이해 트는 신호가 있다.'], ['???', '…엄마는… 괜찮아. …엄마는… 괜찮아.']],
     79: [['???', '…"' + MOM_QUOTE + '"'], ['???', '…자기가 떨어지는데… 남을 걱정해. 왜?']],
-    82: [['???', '…"' + SKY_QUOTE + '" …사람은… 남을… 지켜.'], ['달무리 · 잔광', '…우리… 하늘… 우리… 하늘.'], ['???', '…우리? …나는… 어느 쪽… 이야?']],
+    82: [['???', '…"' + SKY_QUOTE + '"'], ['???', '…자기가 위험한데… 남부터 걱정해. …엄마도, 이 사람도.'], ['달무리 · 잔광', '…우리… 하늘… 우리… 하늘.'], ['???', '…우리? …나는… 어느 쪽… 이야?']],
   },
   guardWarn: '위쪽! 꺼진 달무리에서 신호가 다시 켜졌다. …너를 노린다!',
   guardGlow: '…우리… 하늘… 우리… 하늘.',
   guardSay: ['…사람은… 마지막에… 남을 지킨대.', '…나도, 그거 할래.'],
-  haloAfter: '달무리 격파. …그런데 잔광이 다 꺼지지 않았다. 계속 지켜보겠다.',   // the first time 달무리 falls
+  haloAfter: ['달무리 격파. 기체는 회수했다.', '…그런데 하늘에 잔광이 다 꺼지지 않았다. 계속 지켜보겠다.'],   // the first time 달무리 falls
+  firstPull: '…우리… 하늘….',   // right after 트루먼's first, cutting copy: the wreck's voice pulling at it
   trumanAsk: '…너희는… 왜… 서로를… 부르지?',                                  // 트루먼 below half, the first time: its own words
   hesitate: {
     75: [['???', '…쏘면… 안 되는데….'], ['달무리 · 잔광', '…우리… 하늘….'], ['???', '…아니야. 우리… 하늘이야.']],
@@ -7138,15 +7139,17 @@ function makeShooter() {
       if (!quiet) {
         const stagger = bossNew?.echo || duoNew?.echo;
         let delay = 0;
+        const haloFirst = [bossNew, duoNew].some(nb => nb && nb.id === 'halo' && !nb.echo) && !Save.eSeen('l_74');
         for (const nb of [bossNew, duoNew]) {
           if (!nb) continue;
           if (nb.echo) radioToast('관제탑', ENDLESS_TALK.echoDown[nb.id], delay);
-          else radioToast(nb.name, ENDLESS_TALK.down[nb.id], delay);
+          else radioToast(nb.name, ENDLESS_TALK.down[nb.id], delay, haloFirst);   // 달무리's first fall: its last words are not cut
           if (stagger) delay += 4.6;
         }
-        if ([bossNew, duoNew].some(nb => nb && nb.id === 'halo' && !nb.echo) && !Save.eSeen('l_74')) {
+        if (haloFirst) {
+          // its signal, then the unlock line (sent at 2.5 s), then 관제탑's two lines: each read in full, one after another
           Save.markESeen('l_74');
-          radioToast('관제탑', ENDLESS_TALK.haloAfter, delay + 0.1);
+          later(2.6, () => ENDLESS_TALK.haloAfter.forEach((t, i) => radioToast('관제탑', t, 7 + i * 4.82, true)));
         }
       }
       const fresh = [bossNew, duoNew].filter(nb => nb && !Save.eUnlocked(nb.craft));
@@ -7495,10 +7498,13 @@ function makeShooter() {
         e.mimicT = per; e.shotT = 0.5;
         const pl = PLANES[e.mimic];
         const lines = first && e.firstMimicLine ? TRUMAN_FIRST_MIMIC : TRUMAN_MIMIC;
-        if (!parts.some(q => q.kind === 'radio' && q.hold)) radioToast('트루먼 · ' + pl.pilot.name + ' 흉내', lines[e.mimic]);   // its own words come first
+        e.mimicSay = ['트루먼 · ' + pl.pilot.name + ' 흉내', lines[e.mimic]];   // said now, or once its own words are done (only the latest waits)
+        if (first && e.firstMimicLine && trumanChoiceDue(e)) e.pullNext = true;   // the wreck's voice follows the first copy
         parts.push({ kind: 'text', x: clamp(e.x, 90, W - 90), y: Math.max(e.y + 118, 278), vx: 0, vy: 0, life: 1.2, max: 1.2, text: pl.pilot.name + '의 ' + pl.weaponName, color: hexRgb(pl.look.accent) });   // held still, below where the radio sits
         tone(400 + e.mimic * 120, 0.25, 'triangle', 0.03, 900);
       }
+      if (e.mimicSay && !parts.some(q => q.kind === 'radio' && q.hold)) { radioToast(e.mimicSay[0], e.mimicSay[1]); e.mimicSay = null; }
+      if (e.pullNext) { e.pullNext = false; radioToast('달무리 · 잔광', ENDLESS_TALK.firstPull, 4.2, true, 3.2); }   // after the first line is read; held so the next copy waits
       e.shotT -= fr;
       if (e.shotT <= 0) {
         fireTrumanAs(e, e.mimic, false);
