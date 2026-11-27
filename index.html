@@ -1450,7 +1450,24 @@ function explode(x, y, scale = 1) {
   shake = Math.max(shake, Math.min(0.6, 0.12 * scale));
   boom(0.25 + 0.15 * scale, Math.min(0.3, 0.08 + 0.05 * scale), 700 + 200 * scale);
 }
-function radioToast(name, text, delay = 0) { parts.push({ kind: 'radio', x: W / 2, y: 212, life: 4.6 + delay, max: 4.6 + delay, wait: delay, name, text }); }
+// radio lines share one place on screen, so they take turns and never overlap:
+// one showing now fades out first (0.2 s); one due to start soon goes first and this one follows it;
+// one due much later cuts this one short
+function radioToast(name, text, delay = 0) {
+  const FADE = 0.2, LEN = 4.6, GAP = FADE + 0.02;
+  let start = delay, end = delay + LEN;
+  const due = q => q.life - (q.max - q.wait);   // seconds until it shows (negative: showing now)
+  const radios = parts.filter(q => q.kind === 'radio').sort((a, b) => due(a) - due(b));
+  for (const q of radios) {
+    const qs = due(q);
+    if (q.life <= start || qs >= end) continue;              // no overlap
+    if (qs <= start) { q.life = Math.min(q.life, start + FADE); start += GAP; }
+    else if (qs < start + 1.2) start = q.life + GAP;          // it is about to show: let it, then follow
+    else { end = qs - FADE; continue; }
+    end = start + LEN;
+  }
+  parts.push({ kind: 'radio', x: W / 2, y: 212, life: end, max: end, wait: start, name, text });
+}
 function floatText(x, y, text, color = '255,236,200') {
   parts.push({ kind: 'text', x, y, vx: 0, vy: -40, life: 0.9, max: 0.9, text, color });
 }
