@@ -1484,8 +1484,11 @@ function updateParts(dt) {
   const cap = LITE ? 240 : 900;
   if (parts.length > cap) parts.splice(0, parts.length - cap);
 }
-function drawParts() {
+// radio bubbles are drawn in a second pass, over score numbers and small labels
+function drawParts() { drawPartsPass(false); drawPartsPass(true); }
+function drawPartsPass(radios) {
   for (const q of parts) {
+    if ((q.kind === 'radio') !== radios) continue;
     const a = Math.max(0, q.life / q.max);
     if (q.kind === 'fire') {
       const k = 1 - a;
@@ -1710,7 +1713,8 @@ function drawParts() {
       ctx.save(); ctx.globalAlpha = al;
       ctx.font = '14px "Gowun Dodum", sans-serif';
       const ls = wrapText(q.text, 380), bw = Math.min(440, Math.max(160, ...ls.map(l => ctx.measureText(l).width)) + 32), bh = 30 + ls.length * 19;
-      const bx = q.x - bw / 2, by = q.y - bh / 2 + (1 - Math.min(1, age / 0.3)) * 10;
+      const ry = Math.min(q.y, H * 0.38 - 60 - bh / 2);   // short screens: above the banner band (H * 0.38 - 56)
+      const bx = q.x - bw / 2, by = ry - bh / 2 + (1 - Math.min(1, age / 0.3)) * 10;
       ctx.fillStyle = 'rgba(16,14,40,0.82)'; ctx.strokeStyle = 'rgba(185,164,255,0.65)'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.roundRect ? ctx.roundRect(bx, by, bw, bh, 10) : ctx.rect(bx, by, bw, bh); ctx.fill(); ctx.stroke();
       ctx.textAlign = 'left'; ctx.textBaseline = 'top';
@@ -7492,7 +7496,7 @@ function makeShooter() {
         const pl = PLANES[e.mimic];
         const lines = first && e.firstMimicLine ? TRUMAN_FIRST_MIMIC : TRUMAN_MIMIC;
         if (!parts.some(q => q.kind === 'radio' && q.hold)) radioToast('트루먼 · ' + pl.pilot.name + ' 흉내', lines[e.mimic]);   // its own words come first
-        floatText(e.x, e.y + 110, pl.pilot.name + '의 ' + pl.weaponName, hexRgb(pl.look.accent));
+        parts.push({ kind: 'text', x: clamp(e.x, 90, W - 90), y: Math.max(e.y + 118, 278), vx: 0, vy: 0, life: 1.2, max: 1.2, text: pl.pilot.name + '의 ' + pl.weaponName, color: hexRgb(pl.look.accent) });   // held still, below where the radio sits
         tone(400 + e.mimic * 120, 0.25, 'triangle', 0.03, 900);
       }
       e.shotT -= fr;
